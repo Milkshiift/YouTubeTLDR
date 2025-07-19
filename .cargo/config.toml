@@ -1,6 +1,7 @@
 [build]
 rustflags = [
     "-Z", "threads=8",
+    "-Z", "location-detail=none",
     "-C", "link-arg=-Wl,-z,pack-relative-relocs",
     "-C", "symbol-mangling-version=v0",
     "-C", "link-args=-Wl,--icf=all"
@@ -9,6 +10,7 @@ rustflags = [
 [target.'cfg(target_os = "linux")']
 rustflags = [
     "-Z", "threads=8",
+    "-Z", "location-detail=none",
     "-C", "link-arg=-fuse-ld=mold",
     "-C", "link-arg=-Wl,-z,pack-relative-relocs",
     "-C", "symbol-mangling-version=v0",

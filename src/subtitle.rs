@@ -53,11 +53,9 @@ struct TextEntry {
 }
 
 pub fn get_youtube_transcript(video_url: &str, language: &str) -> Result<Vec<TranscriptEntry>, Box<dyn Error>> {
-    println!("[1/4] Fetching video page to find API key...");
     let video_id = extract_video_id(video_url)?;
     let res = minreq::get(format!("https://youtu.be/{}", video_id)).send()?;
     let html = res.as_str()?;
-
     static API_KEY_RE: OnceLock<Regex> = OnceLock::new();
     let api_key = API_KEY_RE
         .get_or_init(|| Regex::new(r#""INNERTUBE_API_KEY":"([^"]+)""#).unwrap())
@@ -65,10 +63,7 @@ pub fn get_youtube_transcript(video_url: &str, language: &str) -> Result<Vec<Tra
         .and_then(|caps| caps.get(1))
         .map(|m| m.as_str())
         .ok_or("INNERTUBE_API_KEY not found")?;
-
-    println!("      Found API Key: ...{}", &api_key[api_key.len().saturating_sub(6)..]);
-
-    println!("[2/4] Fetching player data...");
+    
     let player_url = format!("https://www.youtube.com/youtubei/v1/player?key={}", api_key);
 
     let player_data_response = minreq::post(&player_url)
@@ -83,18 +78,14 @@ pub fn get_youtube_transcript(video_url: &str, language: &str) -> Result<Vec<Tra
         }))?
         .send()?
         .json::<PlayerDataResponse>()?;
-
-    println!("[3/4] Finding caption track for language '{}'...", language);
+    
     let track = player_data_response
         .captions
         .as_ref()
         .and_then(|c| c.player_captions_tracklist_renderer.as_ref())
         .and_then(|r| r.caption_tracks.iter().find(|t| t.language_code == language))
         .ok_or_else(|| format!("No captions found for language: {}", language))?;
-
-    println!("      Found transcript URL.");
-
-    println!("[4/4] Fetching and parsing XML transcript...");
+    
     let res = minreq::get(&track.base_url).send()?; 
     let xml = res.as_bytes();
     let parsed_xml: Transcript = quick_xml::de::from_reader(xml)?;

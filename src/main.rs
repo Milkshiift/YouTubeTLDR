@@ -1,8 +1,10 @@
+mod gemini;
 mod subtitle;
 
 use tiny_http::{Server, Response, Request, StatusCode, Header};
 use serde::{Deserialize, Serialize};
-use std::{thread};
+use std::{env, thread};
+use std::sync::LazyLock;
 use crate::subtitle::{get_youtube_transcript, merge_transcript, MergeConfig};
 
 #[derive(Deserialize)]
@@ -13,12 +15,17 @@ struct SummarizeRequest {
 #[derive(Serialize)]
 struct SummarizeResponse {
     summary: String,
+    subtitles: String
 }
 
 #[derive(Serialize)]
 struct ErrorResponse {
     error: String,
 }
+
+static GEMINI_API_KEY: LazyLock<String> = LazyLock::new(|| {
+    env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set")
+});
 
 fn main() {
     let server = Server::http("0.0.0.0:8000").unwrap();
@@ -87,28 +94,23 @@ fn handle_summarize(mut request: Request) {
             return;
         }
     };
-
-    println!("Spawning worker thread for URL: {}", summarize_request.url);
+    
     let job_handle = thread::spawn(move || {
-        println!("Worker: Getting transcript...");
         let transcript = get_youtube_transcript(&summarize_request.url, "en").unwrap();
-        
-        println!("{:#?}", transcript);
         
         let merged_transcript = merge_transcript(&transcript, &MergeConfig {
             paragraph_pause_threshold_secs: 1.5,
             remove_annotations: false,
         });
-
-        println!("Worker: Calling Gemini API...");
+        
         let summary = format!("This is a brilliant summary of the transcript: '{}'", merged_transcript);
 
-        summary
+        (summary, merged_transcript)
     });
 
     match job_handle.join() {
-        Ok(summary_text) => {
-            let success_response = SummarizeResponse { summary: summary_text };
+        Ok((summary_text, merged_transcript)) => {
+            let success_response = SummarizeResponse { summary: summary_text, subtitles: merged_transcript };
             let json_response = serde_json::to_string(&success_response).unwrap();
 
             let response = Response::from_string(json_response)
