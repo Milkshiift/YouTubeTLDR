@@ -1,0 +1,3 @@
+body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; }
+#summary { margin-top: 1.5rem; padding: 1rem; background-color: #f4f4f4; }
+.hidden { display: none; }
