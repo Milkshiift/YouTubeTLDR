@@ -118,7 +118,7 @@ pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> St
     }
 
     let annotation_regex = ANNOTATION_REGEX.get_or_init(|| Regex::new(r"\[[^\]]*\]|\([^)]*\)").unwrap());
-    
+
     let cleaned_entries: Vec<_> = entries.iter()
         .filter_map(|entry| {
             let cleaned = if config.remove_annotations {
@@ -164,11 +164,18 @@ pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> St
             result.push_str("\n\n");
             current_line = current_text.clone();
         } else {
-            let max_overlap = current_line.len().min(current_text.len());
-            let overlap = (1..=max_overlap)
-                .rev()
-                .find(|&len| current_line.ends_with(&current_text[..len]))
-                .unwrap_or(0);
+            let mut overlap = 0;
+            // Iterate backwards through all possible prefix lengths of current_text.
+            for i in (1..=current_line.len().min(current_text.len())).rev() {
+                // Ensure i is a valid UTF-8 boundary in current_text before slicing.
+                if current_text.is_char_boundary(i) {
+                    let prefix = &current_text[..i];
+                    if current_line.ends_with(prefix) {
+                        overlap = i; // `i` is the byte length of the valid overlap.
+                        break;
+                    }
+                }
+            }
 
             // The ONLY time we perform a smart merge is for true fragmentation:
             // 1. Timestamps must overlap.

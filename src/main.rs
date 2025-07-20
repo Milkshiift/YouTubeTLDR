@@ -5,6 +5,9 @@ use tiny_http::{Server, Response, Request, StatusCode, Header};
 use serde::{Deserialize, Serialize};
 use std::{env, thread};
 use std::sync::LazyLock;
+use crate::gemini::ask::Gemini;
+use crate::gemini::types::request::SystemInstruction;
+use crate::gemini::types::sessions::Session;
 use crate::subtitle::{get_youtube_transcript, merge_transcript, MergeConfig};
 
 #[derive(Deserialize)]
@@ -99,11 +102,17 @@ fn handle_summarize(mut request: Request) {
         let transcript = get_youtube_transcript(&summarize_request.url, "en").unwrap();
         
         let merged_transcript = merge_transcript(&transcript, &MergeConfig {
-            paragraph_pause_threshold_secs: 1.5,
+            paragraph_pause_threshold_secs: 2.0,
             remove_annotations: false,
         });
-        
-        let summary = format!("This is a brilliant summary of the transcript: '{}'", merged_transcript);
+
+
+        let gemini = Gemini::new(&*GEMINI_API_KEY, "gemini-2.5-flash-lite-preview-06-17".to_string(), Some(SystemInstruction::from_str(
+            "You are an expert video summarizer specializing in creating structured, accurate overviews. Given a YouTube video transcript, extract and present the most crucial information in an article-style format. Prioritize fidelity to the original content, ensuring all significant points, arguments, and key details are faithfully represented. Organize the summary logically with clear, descriptive headings and/or concise bullet points. For maximum skim-readability, bold key terms, core concepts, and critical takeaways within the text. Eliminate conversational filler, repeated phrases, and irrelevant tangents, but retain all essential content."
+        )));
+        let mut session = Session::new(2);
+        session.ask_string(merged_transcript.clone());
+        let summary = gemini.ask(&mut session).unwrap().get_text("");
 
         (summary, merged_transcript)
     });
