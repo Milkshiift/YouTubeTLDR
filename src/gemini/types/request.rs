@@ -27,9 +27,6 @@ impl Chat {
     pub fn parts(&self) -> &Vec<Part> {
         &self.parts
     }
-    pub(crate) fn parts_mut(&mut self) -> &mut Vec<Part> {
-        &mut self.parts
-    }
 }
 
 #[derive(Serialize, Debug, Clone)]

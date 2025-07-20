@@ -3,8 +3,7 @@ mod subtitle;
 
 use tiny_http::{Server, Response, Request, StatusCode, Header};
 use serde::{Deserialize, Serialize};
-use std::{env, thread};
-use std::sync::LazyLock;
+use std::thread;
 use crate::gemini::ask::Gemini;
 use crate::gemini::types::request::SystemInstruction;
 use crate::gemini::types::sessions::Session;
@@ -30,9 +29,7 @@ struct ErrorResponse {
     error: String,
 }
 
-static GEMINI_API_KEY: LazyLock<String> = LazyLock::new(|| {
-    env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set")
-});
+
 
 fn main() {
     let server = Server::http("0.0.0.0:8000").unwrap();

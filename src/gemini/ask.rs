@@ -3,7 +3,6 @@ use super::types::request::{GeminiRequestBody, SystemInstruction};
 use super::types::response::GeminiResponse;
 use super::types::sessions::Session;
 use serde_json::Value;
-use std::env;
 use std::time::Duration;
 
 const BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -36,38 +35,6 @@ impl Gemini {
         }
     }
 
-    /// `sys_prompt` should follow [gemini doc](https://ai.google.dev/gemini-api/docs/text-generation#image-input)
-    pub fn new_with_timeout(
-        api_key: impl Into<String>,
-        model: impl Into<String>,
-        sys_prompt: Option<SystemInstruction>,
-        api_timeout: Duration,
-    ) -> Self {
-        Self {
-            api_key: api_key.into(),
-            model: model.into(),
-            sys_prompt,
-            generation_config: None,
-            timeout: Some(api_timeout),
-        }
-    }
-
-    /// The generation config Schema should follow [Gemini docs](https://ai.google.dev/api/generate-content#generationconfig)
-    pub fn set_generation_config(mut self, generation_config: Value) -> Self {
-        self.generation_config = Some(generation_config);
-        self
-    }
-
-    pub fn set_model(mut self, model: impl Into<String>) -> Self {
-        self.model = model.into();
-        self
-    }
-
-    pub fn set_api_key(mut self, api_key: impl Into<String>) -> Self {
-        self.api_key = api_key.into();
-        self
-    }
-
     pub fn ask(&self, session: &mut Session) -> Result<GeminiResponse, GeminiResponseError> {
         let req_url = format!(
             "{BASE_URL}/{}:generateContent?key={}",
@@ -97,17 +64,4 @@ impl Gemini {
         session.update(&reply);
         Ok(reply)
     }
-}
-
-#[test]
-fn test_ask() {
-    let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set");
-    let gemini = Gemini::new(api_key, "gemini-2.0-flash-lite".to_string(), Some(SystemInstruction::from_str("You are a friendly bot.")));
-    let mut session = Session::new(2);
-    session.ask_string("Hello, how are you?");
-    let response = gemini.ask(&mut session);
-    assert!(response.is_ok());
-    let response = response.unwrap();
-    assert!(!response.get_text("").is_empty());
-    println!("{}", response.get_text(""));
 }

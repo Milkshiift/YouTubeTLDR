@@ -1,7 +1,5 @@
-use regex::Regex;
 use serde::Deserialize;
 use std::error::Error;
-use std::sync::OnceLock;
 use html_escape::decode_html_entities;
 
 #[derive(Debug, Deserialize)]
@@ -56,12 +54,10 @@ pub fn get_youtube_transcript(video_url: &str, language: &str) -> Result<Vec<Tra
     let video_id = extract_video_id(video_url)?;
     let res = minreq::get(format!("https://youtu.be/{}", video_id)).send()?;
     let html = res.as_str()?;
-    static API_KEY_RE: OnceLock<Regex> = OnceLock::new();
-    let api_key = API_KEY_RE
-        .get_or_init(|| Regex::new(r#""INNERTUBE_API_KEY":"([^"]+)""#).unwrap())
-        .captures(html)
-        .and_then(|caps| caps.get(1))
-        .map(|m| m.as_str())
+    
+    let api_key = html.split(r#""INNERTUBE_API_KEY":""#)
+        .nth(1)
+        .and_then(|s| s.split('"').next())
         .ok_or("INNERTUBE_API_KEY not found")?;
     
     let player_url = format!("https://www.youtube.com/youtubei/v1/player?key={}", api_key);
@@ -110,22 +106,30 @@ pub struct MergeConfig {
     pub remove_annotations: bool,
 }
 
-static ANNOTATION_REGEX: OnceLock<Regex> = OnceLock::new();
+fn remove_annotations(text: &str) -> String {
+    let mut cleaned = String::new();
+    let mut depth = 0;
+    for c in text.chars() {
+        if c == '[' || c == '(' {
+            depth += 1;
+        } else if (c == ']' || c == ')') && depth > 0 {
+            depth -= 1;
+        } else if depth == 0 {
+            cleaned.push(c);
+        }
+    }
+    cleaned
+}
 
 pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> String {
     if entries.is_empty() {
         return String::new();
     }
 
-    let annotation_regex = ANNOTATION_REGEX.get_or_init(|| Regex::new(r"\[[^\]]*\]|\([^)]*\)").unwrap());
-
     let cleaned_entries: Vec<_> = entries.iter()
         .filter_map(|entry| {
             let cleaned = if config.remove_annotations {
-                annotation_regex
-                    .replace_all(&entry.caption, "")
-                    .trim()
-                    .to_string()
+                remove_annotations(&entry.caption).trim().to_string()
             } else {
                 entry.caption.trim().to_string()
             };
@@ -144,59 +148,23 @@ pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> St
 
     let mut result = String::new();
     let mut current_line = cleaned_entries[0].2.clone();
-
-    let is_first_entry_speech = !annotation_regex.replace_all(&cleaned_entries[0].2, "").trim().is_empty();
-    let mut last_speech_end_time = if is_first_entry_speech { cleaned_entries[0].1 } else { 0.0 };
+    let mut last_speech_end_time = cleaned_entries[0].1;
 
     for i in 1..cleaned_entries.len() {
-        let (_, prev_end, _) = cleaned_entries[i - 1];
         let (current_start, current_end, current_text) = &cleaned_entries[i];
 
-        let is_speech = !annotation_regex.replace_all(current_text, "").trim().is_empty();
-        let pause_duration = if is_speech && last_speech_end_time > 0.0 {
-            current_start - last_speech_end_time
-        } else {
-            0.0
-        };
+        let pause_duration = *current_start - last_speech_end_time;
 
-        if is_speech && pause_duration >= config.paragraph_pause_threshold_secs {
+        if pause_duration >= config.paragraph_pause_threshold_secs {
             result.push_str(&current_line);
             result.push_str("\n\n");
             current_line = current_text.clone();
         } else {
-            let mut overlap = 0;
-            // Iterate backwards through all possible prefix lengths of current_text.
-            for i in (1..=current_line.len().min(current_text.len())).rev() {
-                // Ensure i is a valid UTF-8 boundary in current_text before slicing.
-                if current_text.is_char_boundary(i) {
-                    let prefix = &current_text[..i];
-                    if current_line.ends_with(prefix) {
-                        overlap = i; // `i` is the byte length of the valid overlap.
-                        break;
-                    }
-                }
-            }
-
-            // The ONLY time we perform a smart merge is for true fragmentation:
-            // 1. Timestamps must overlap.
-            // 2. Text must have a PARTIAL overlap (not full, not zero).
-            if *current_start < prev_end && overlap > 0 && overlap < current_text.len() {
-                // This is a true fragment, like "Hello wor" + "world".
-                // Append the non-overlapping part.
-                current_line.push_str(&current_text[overlap..]);
-            } else {
-                // All other cases are treated as new, distinct words/phrases:
-                // - Timestamps don't overlap.
-                // - Timestamps overlap but text has zero overlap (e.g., "then." + "All right").
-                // - Timestamps overlap but text is a full match (e.g., "Go!" + "Go!").
-                current_line.push(' ');
-                current_line.push_str(current_text);
-            }
+            current_line.push(' ');
+            current_line.push_str(current_text);
         }
 
-        if is_speech {
-            last_speech_end_time = last_speech_end_time.max(*current_end);
-        }
+        last_speech_end_time = last_speech_end_time.max(*current_end);
     }
 
     result.push_str(&current_line);
@@ -204,16 +172,20 @@ pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> St
 }
 
 fn extract_video_id(url: &str) -> Result<String, Box<dyn Error>> {
-    static YOUTUBE_REGEX: OnceLock<Regex> = OnceLock::new();
-    let re = YOUTUBE_REGEX.get_or_init(|| {
-        Regex::new(
-            r#"^(?:(?:https?:)?//)?(?:(?:www|m)\.)?(?:youtube\.com|youtu\.be)(?:/(?:[\w-]+\?v=|embed/|v/|shorts/)?|/)([\w-]{11})(?:\S+)?$"#,
-        )
-            .expect("Invalid regex")
-    });
-
-    re.captures(url)
-        .and_then(|caps| caps.get(1))
-        .map(|m| m.as_str().to_string())
-        .ok_or_else(|| format!("Invalid YouTube URL: {}", url).into())
+    if let Some(id) = url.split("v=").nth(1) {
+        return Ok(id.chars().take(11).collect());
+    }
+    if let Some(id) = url.split("/embed/").nth(1) {
+        return Ok(id.chars().take(11).collect());
+    }
+    if let Some(id) = url.split("/v/").nth(1) {
+        return Ok(id.chars().take(11).collect());
+    }
+    if let Some(id) = url.split("/shorts/").nth(1) {
+        return Ok(id.chars().take(11).collect());
+    }
+    if let Some(id) = url.split("youtu.be/").nth(1) {
+        return Ok(id.chars().take(11).collect());
+    }
+    Err(format!("Invalid YouTube URL: {}", url).into())
 }

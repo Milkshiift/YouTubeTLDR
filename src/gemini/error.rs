@@ -1,4 +1,5 @@
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum GeminiResponseError {
     MinreqError(minreq::Error),
     ///Contains the response string
