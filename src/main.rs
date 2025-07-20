@@ -13,6 +13,10 @@ use crate::subtitle::{get_youtube_transcript, merge_transcript, MergeConfig};
 #[derive(Deserialize)]
 struct SummarizeRequest {
     url: String,
+    api_key: Option<String>,
+    model: Option<String>,
+    system_prompt: Option<String>,
+    dry_run: bool
 }
 
 #[derive(Serialize)]
@@ -92,33 +96,44 @@ fn handle_summarize(mut request: Request) {
 
     let summarize_request: SummarizeRequest = match serde_json::from_str(&body) {
         Ok(req) => req,
-        Err(_) => {
-            respond_with_error(request, "Invalid JSON format", StatusCode(400));
+        Err(e) => {
+            let error_message = format!("Invalid JSON format: {}", e);
+            respond_with_error(request, &error_message, StatusCode(400));
             return;
         }
     };
-    
-    let job_handle = thread::spawn(move || {
-        let transcript = get_youtube_transcript(&summarize_request.url, "en").unwrap();
-        
+
+    let job_handle = thread::spawn(move || -> Result<(String, String), String> {
+        if summarize_request.dry_run {
+            let test = include_str!("./markdown_test.md").to_string();
+            return Ok((test.clone(), test));
+        }
+
+        let transcript = get_youtube_transcript(&summarize_request.url, "en")
+            .map_err(|e| format!("Failed to get YouTube transcript: {}", e))?;
+
         let merged_transcript = merge_transcript(&transcript, &MergeConfig {
             paragraph_pause_threshold_secs: 2.0,
             remove_annotations: false,
         });
 
+        let api_key = summarize_request.api_key.filter(|k| !k.is_empty()).ok_or("API key not provided")?;
+        let model = summarize_request.model.unwrap_or_else(|| "gemini-2.5-flash".to_string());
+        let system_prompt = summarize_request.system_prompt.unwrap_or_else(|| "You are an expert video summarizer specializing in creating structured, accurate overviews. Given a YouTube video transcript, extract and present the most crucial information in an article-style format. Prioritize fidelity to the original content, ensuring all significant points, arguments, and key details are faithfully represented. Organize the summary logically with clear, descriptive headings and/or concise bullet points. For maximum skim-readability, bold key terms, core concepts, and critical takeaways within the text. Eliminate conversational filler, repeated phrases, and irrelevant tangents, but retain all essential content.".to_string());
 
-        let gemini = Gemini::new(&*GEMINI_API_KEY, "gemini-2.5-flash-lite-preview-06-17".to_string(), Some(SystemInstruction::from_str(
-            "You are an expert video summarizer specializing in creating structured, accurate overviews. Given a YouTube video transcript, extract and present the most crucial information in an article-style format. Prioritize fidelity to the original content, ensuring all significant points, arguments, and key details are faithfully represented. Organize the summary logically with clear, descriptive headings and/or concise bullet points. For maximum skim-readability, bold key terms, core concepts, and critical takeaways within the text. Eliminate conversational filler, repeated phrases, and irrelevant tangents, but retain all essential content."
-        )));
+        let gemini = Gemini::new(&api_key, model, Some(SystemInstruction::from_str(&system_prompt)));
         let mut session = Session::new(2);
         session.ask_string(merged_transcript.clone());
-        let summary = gemini.ask(&mut session).unwrap().get_text("");
+        
+        let summary = gemini.ask(&mut session)
+            .map_err(|e| format!("Gemini API request failed: {}", e))?
+            .get_text("");
 
-        (summary, merged_transcript)
+        Ok((summary, merged_transcript))
     });
 
     match job_handle.join() {
-        Ok((summary_text, merged_transcript)) => {
+        Ok(Ok((summary_text, merged_transcript))) => {
             let success_response = SummarizeResponse { summary: summary_text, subtitles: merged_transcript };
             let json_response = serde_json::to_string(&success_response).unwrap();
 
@@ -128,8 +143,13 @@ fn handle_summarize(mut request: Request) {
 
             request.respond(response).unwrap();
         }
+        Ok(Err(error_message)) => {
+            eprintln!("Worker thread failed with error: {}", error_message);
+            respond_with_error(request, &error_message, StatusCode(500));
+        }
         Err(_) => {
-            respond_with_error(request, "Worker thread failed", StatusCode(500));
+            eprintln!("Worker thread panicked unexpectedly.");
+            respond_with_error(request, "A critical error occurred in the worker thread.", StatusCode(500));
         }
     }
 }

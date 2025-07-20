@@ -2,23 +2,61 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube TLDR</title>
-    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="style.css">
     <script type="module" src="https://md-block.verou.me/md-block.js"></script>
 </head>
 <body>
-<h1>YouTube TLDR</h1>
-<p>Paste a YouTube video URL below.</p>
 
-<form id="summary-form">
-    <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=...">
-    <button type="button" id="submit">Summarize</button>
-</form>
+    <main class="container">
+        <header>
+            <h1>YouTube TLDR</h1>
+            <p>Enter a YouTube URL to get a summary.</p>
+        </header>
 
-<p id="loader" class="hidden">Generating...</p>
+        <form id="summary-form">
+            <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=..." required>
+            <button type="submit">Summarize</button>
+        </form>
 
-<md-block id="summary-output"></md-block>
+        <details class="settings-details">
+            <summary>Settings</summary>
+            <div class="settings-content">
+                <label for="api-key">Gemini API Key</label>
+                <input type="password" id="api-key" placeholder="Using key from environment if empty">
 
-<script src="./script.js"></script>
+                <label for="model">Model</label>
+                <input type="text" id="model">
+
+                <label for="system-prompt">System Prompt</label>
+                <textarea id="system-prompt" rows="6"></textarea>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="dry-run">
+                    <label for="dry-run">Dry Run (skip YouTube and Gemini network calls and show test data)</label>
+                </div>
+            </div>
+        </details>
+
+        <div id="status-container" class="hidden">
+            <p id="loader">Generating summary...</p>
+            <p id="error-message"></p>
+        </div>
+
+        <div id="summary-container" class="hidden">
+            <h2>Summary</h2>
+            <md-block id="summary-output"></md-block>
+        </div>
+
+        <div id="transcript-section" class="hidden">
+            <details id="transcript-details">
+                <summary>View Raw Transcript</summary>
+                <pre id="transcript-text"></pre>
+            </details>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
 </body>
 </html>

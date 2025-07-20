@@ -8,7 +8,7 @@ readme = "README.md"
 license = "MIT"
 
 [dependencies]
-minreq = { version = "2.14", features = ["json-using-serde", "https"] }
+minreq = { version = "2.14", features = ["json-using-serde", "https-native"] }
 quick-xml = { version = "0.38", features = ["serialize"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
