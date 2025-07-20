@@ -1,3 +1,24 @@
-body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; }
-#summary { margin-top: 1.5rem; padding: 1rem; background-color: #f4f4f4; }
-.hidden { display: none; }
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+#summary {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background-color: #f4f4f4;
+}
+
+.hidden {
+    display: none;
+}
+
+.error {
+    color: red;
+}

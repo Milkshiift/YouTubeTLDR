@@ -3,17 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <title>YouTube TLDR</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="./style.css">
+    <script type="module" src="https://md-block.verou.me/md-block.js"></script>
 </head>
 <body>
 <h1>YouTube TLDR</h1>
 <p>Paste a YouTube video URL below.</p>
+
 <form id="summary-form">
     <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=...">
-    <button type="submit">Summarize</button>
+    <button type="button" id="submit">Summarize</button>
 </form>
-<div id="loader" class="hidden">Loading...</div>
-<div id="summary-output"></div>
-<script src="/script.js"></script>
+
+<p id="loader" class="hidden">Generating...</p>
+
+<md-block id="summary-output"></md-block>
+
+<script src="./script.js"></script>
 </body>
 </html>
