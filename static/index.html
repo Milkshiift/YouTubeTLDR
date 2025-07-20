@@ -8,54 +8,70 @@
     <script type="module" src="https://md-block.verou.me/md-block.js"></script>
 </head>
 <body>
+    <div class="app-container">
+        <aside id="sidebar">
+            <header class="sidebar-header">
+                <button id="new-summary-btn">+ New Summary</button>
+            </header>
+            <section id="saved-summaries-section">
+                <h2>History</h2>
+                <ul id="saved-summaries-list"></ul>
+            </section>
+            <footer class="sidebar-footer">
+                <button id="clear-summaries-btn" title="Clear all saved summaries">Clear History</button>
+            </footer>
+        </aside>
 
-    <main class="container">
-        <header>
-            <h1>YouTube TLDR</h1>
-            <p>Enter a YouTube URL to get a summary.</p>
-        </header>
+        <main id="main-content">
+            <div id="welcome-view">
+                <header>
+                    <h1>YouTube TLDR</h1>
+                    <p>Enter a YouTube URL to get a summary.</p>
+                </header>
+                <form id="summary-form">
+                    <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=..." required>
+                    <button type="submit">Summarize</button>
+                </form>
+                 <details class="settings-details">
+                    <summary>Settings</summary>
+                    <div class="settings-content">
+                        <label for="api-key">Gemini API Key</label>
+                        <input type="password" id="api-key" placeholder="Using key from environment if empty">
 
-        <form id="summary-form">
-            <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=..." required>
-            <button type="submit">Summarize</button>
-        </form>
+                        <label for="model">Model</label>
+                        <input type="text" id="model">
 
-        <details class="settings-details">
-            <summary>Settings</summary>
-            <div class="settings-content">
-                <label for="api-key">Gemini API Key</label>
-                <input type="password" id="api-key" placeholder="Using key from environment if empty">
+                        <label for="system-prompt">System Prompt</label>
+                        <textarea id="system-prompt" rows="6"></textarea>
 
-                <label for="model">Model</label>
-                <input type="text" id="model">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="dry-run">
+                            <label for="dry-run">Dry Run (skip YouTube and Gemini network calls and show test data)</label>
+                        </div>
+                    </div>
+                </details>
+            </div>
 
-                <label for="system-prompt">System Prompt</label>
-                <textarea id="system-prompt" rows="6"></textarea>
+            <div id="summary-view" class="hidden">
+                <div id="status-container" class="hidden">
+                    <p id="loader">Generating summary...</p>
+                    <p id="error-message"></p>
+                </div>
 
-                <div class="checkbox-group">
-                    <input type="checkbox" id="dry-run">
-                    <label for="dry-run">Dry Run (skip YouTube and Gemini network calls and show test data)</label>
+                <div id="summary-container" class="hidden">
+                    <h2 id="summary-title">Summary</h2>
+                    <md-block id="summary-output"></md-block>
+                </div>
+
+                <div id="transcript-section" class="hidden">
+                    <details id="transcript-details">
+                        <summary>View Raw Transcript</summary>
+                        <pre id="transcript-text"></pre>
+                    </details>
                 </div>
             </div>
-        </details>
-
-        <div id="status-container" class="hidden">
-            <p id="loader">Generating summary...</p>
-            <p id="error-message"></p>
-        </div>
-
-        <div id="summary-container" class="hidden">
-            <h2>Summary</h2>
-            <md-block id="summary-output"></md-block>
-        </div>
-
-        <div id="transcript-section" class="hidden">
-            <details id="transcript-details">
-                <summary>View Raw Transcript</summary>
-                <pre id="transcript-text"></pre>
-            </details>
-        </div>
-    </main>
+        </main>
+    </div>
 
     <script src="script.js"></script>
 </body>

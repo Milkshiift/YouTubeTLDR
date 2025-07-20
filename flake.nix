@@ -14,6 +14,7 @@
         {
           devShells.default = pkgs.mkShell {
             nativeBuildInputs = [
+              pkgs.upx
               pkgs.openssl
               pkgs.pkg-config
             ];
