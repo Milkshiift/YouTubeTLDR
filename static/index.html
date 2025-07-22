@@ -82,13 +82,21 @@
                 </div>
 
                 <div id="summary-container" class="hidden">
-                    <h2 id="summary-title"><i class="fas fa-file-contract"></i> Summary</h2>
+                    <h2 id="summary-title">
+                        <span><i class="fas fa-file-contract"></i> <span id="summary-title-text">Summary</span></span>
+                        <button id="copy-summary-btn" class="icon-btn" title="Copy Summary"><i class="fas fa-copy"></i></button>
+                    </h2>
                     <md-block id="summary-output"></md-block>
                 </div>
 
                 <div id="transcript-section" class="hidden">
                     <details id="transcript-details">
-                        <summary><i class="fas fa-scroll"></i> View Raw Transcript</summary>
+                        <summary>
+                            <span><i class="fas fa-scroll"></i> View Raw Transcript</span>
+                            <span class="summary-actions">
+                                <button id="copy-transcript-btn" class="icon-btn" title="Copy Transcript"><i class="fas fa-copy"></i></button>
+                            </span>
+                        </summary>
                         <pre id="transcript-text"></pre>
                     </details>
                 </div>

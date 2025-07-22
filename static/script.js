@@ -22,10 +22,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const summaryContainer = document.getElementById('summary-container');
     const summaryTitle = document.getElementById('summary-title');
+    const summaryTitleText = document.getElementById('summary-title-text');
     const summaryOutput = document.getElementById('summary-output');
 
     const transcriptSection = document.getElementById('transcript-section');
     const transcriptText = document.getElementById('transcript-text');
+
+    const copySummaryBtn = document.getElementById('copy-summary-btn');
+    const copyTranscriptBtn = document.getElementById('copy-transcript-btn');
 
     const baseURL = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
 
@@ -97,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSavedSummaries();
             switchView(true);
             setStatus(false);
-            summaryTitle.textContent = summary.url;
+            summaryTitleText.textContent = summary.url;
             summaryOutput.mdContent = summary.summary;
             summaryContainer.classList.remove('hidden');
 
@@ -196,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             setStatus(false);
-            summaryTitle.textContent = url;
+            summaryTitleText.textContent = url;
             summaryOutput.mdContent = data.summary;
             summaryContainer.classList.remove('hidden');
 
@@ -249,6 +253,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 viewSummary(index);
             }
         }
+    });
+
+    async function copyToClipboard(text, button) {
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            const originalIcon = button.innerHTML;
+            const originalTitle = button.title;
+            button.innerHTML = '<i class="fas fa-check"></i>';
+            button.title = 'Copied!';
+            setTimeout(() => {
+                button.innerHTML = originalIcon;
+                button.title = originalTitle;
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+            const originalTitle = button.title;
+            button.title = 'Failed to copy';
+            setTimeout(() => {
+                button.title = originalTitle;
+            }, 2000);
+        }
+    }
+
+    copySummaryBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        copyToClipboard(summaryOutput.mdContent, copySummaryBtn);
+    });
+
+    copyTranscriptBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        copyToClipboard(transcriptText.textContent, copyTranscriptBtn);
     });
 });
 
