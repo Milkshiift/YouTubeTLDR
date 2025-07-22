@@ -503,19 +503,17 @@
     #summary-title {
         font-size: 1.75rem;
         font-weight: 700;
-        padding-bottom: 1.25rem;
+        padding: 0 1rem 1.25rem;
         margin-bottom: 1.5rem;
         border-bottom: 1px solid var(--border-color);
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        justify-content: space-between;
     }
 
-    #summary-title > span {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
+    #summary-title-text {
+        flex-grow: 1;      /* Allows this element to grow and fill the empty space */
+        text-align: center;/* Centers the text within the now-expanded span */
+        margin: 0 1rem;    /* Adds space between the text and the icons */
     }
 
     #summary-title i {
