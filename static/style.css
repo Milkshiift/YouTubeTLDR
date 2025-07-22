@@ -80,6 +80,11 @@
     ::-webkit-scrollbar-thumb:hover {
         background: var(--border-color);
     }
+
+    ::selection {
+        background-color: var(--primary-active-bg);
+        color: var(--text-primary);
+    }
 }
 
 @layer layout {
@@ -111,7 +116,7 @@
     #welcome-view,
     #summary-view {
         width: 100%;
-        max-width: 800px;
+        max-width: 70ch;
 
         margin-top: 3rem;
         margin-bottom: 3rem;
