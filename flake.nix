@@ -1,6 +1,8 @@
 {
   description = "OpenSSL";
 
+  # I already have a system-wide rust toolchain so it's not included here
+
   inputs = {
       nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
       flake-utils.url = "github:numtide/flake-utils";

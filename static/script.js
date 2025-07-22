@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Elements ---
     const apiKeyInput = document.getElementById('api-key');
     const modelInput = document.getElementById('model');
     const systemPromptInput = document.getElementById('system-prompt');
@@ -30,7 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const baseURL = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
 
-    // --- Local Storage Keys ---
     const API_KEY_STORAGE_KEY = 'youtube-tldr-api-key';
     const MODEL_STORAGE_KEY = 'youtube-tldr-model';
     const SYSTEM_PROMPT_STORAGE_KEY = 'youtube-tldr-system-prompt';
@@ -41,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let activeSummaryIndex = -1;
 
-    // --- Functions ---
     function getSummaries() {
         return JSON.parse(localStorage.getItem(SUMMARIES_STORAGE_KEY)) || [];
     }
@@ -59,17 +56,34 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderSavedSummaries() {
         const summaries = getSummaries();
         savedSummariesList.innerHTML = '';
+
         if (summaries.length > 0) {
             summaries.forEach((summary, index) => {
                 const li = document.createElement('li');
+                if (index === activeSummaryIndex) {
+                    li.classList.add('active');
+                }
+
                 const a = document.createElement('a');
                 a.href = '#';
-                a.textContent = summary.url;
                 a.dataset.index = index;
-                if (index === activeSummaryIndex) {
-                    a.classList.add('active');
-                }
-                li.appendChild(a);
+                a.title = summary.url;
+
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-file-alt';
+
+                const text = document.createElement('span');
+                text.textContent = summary.url;
+
+                a.append(icon, text);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-summary-btn';
+                deleteBtn.dataset.index = index;
+                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                deleteBtn.title = 'Delete summary';
+
+                li.append(a, deleteBtn);
                 savedSummariesList.appendChild(li);
             });
         }
@@ -79,14 +93,39 @@ document.addEventListener('DOMContentLoaded', () => {
         const summaries = getSummaries();
         const summary = summaries[index];
         if (summary) {
-            activeSummaryIndex = parseInt(index);
+            activeSummaryIndex = parseInt(index, 10);
             renderSavedSummaries();
             switchView(true);
             setStatus(false);
             summaryTitle.textContent = summary.url;
             summaryOutput.mdContent = summary.summary;
             summaryContainer.classList.remove('hidden');
-            transcriptSection.classList.add('hidden');
+
+            if (summary.transcript && summary.transcript.trim()) {
+                transcriptText.textContent = summary.transcript;
+                transcriptSection.classList.remove('hidden');
+            } else {
+                transcriptSection.classList.add('hidden');
+            }
+        }
+    }
+
+    function deleteSummary(indexToDelete) {
+        const summaries = getSummaries();
+        const summaryToDelete = summaries[indexToDelete];
+        if (!summaryToDelete) return;
+
+        if (confirm(`Are you sure you want to delete the summary for "${summaryToDelete.url}"?`)) {
+            summaries.splice(indexToDelete, 1);
+
+            if (activeSummaryIndex === indexToDelete) {
+                activeSummaryIndex = -1;
+                switchView(false);
+            } else if (activeSummaryIndex > indexToDelete) {
+                activeSummaryIndex--;
+            }
+            
+            saveSummaries(summaries);
         }
     }
 
@@ -115,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setStatus(isLoading = false, error = null) {
         const hasStatus = isLoading || error;
         statusContainer.classList.toggle('hidden', !hasStatus);
-        loader.style.display = isLoading ? 'block' : 'none';
+        loader.style.display = isLoading ? 'flex' : 'none';
         errorMessage.style.display = error ? 'block' : 'none';
         errorMessage.textContent = error || '';
 
@@ -167,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const summaries = getSummaries();
-            summaries.unshift({ url: url, summary: data.summary });
+            summaries.unshift({ url: url, summary: data.summary, transcript: data.subtitles });
             saveSummaries(summaries);
             activeSummaryIndex = 0;
             renderSavedSummaries();
@@ -177,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Initial Load & Event Listeners ---
+
     loadSettings();
     renderSavedSummaries();
     form.addEventListener('submit', summarize);
@@ -191,15 +230,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     savedSummariesList.addEventListener('click', (e) => {
-        if (e.target.tagName === 'A') {
+        const link = e.target.closest('a');
+        const deleteBtn = e.target.closest('.delete-summary-btn');
+
+        if (deleteBtn) {
             e.preventDefault();
-            const index = e.target.dataset.index;
-            viewSummary(index);
+            const index = parseInt(deleteBtn.dataset.index, 10);
+            if (!isNaN(index)) {
+                deleteSummary(index);
+            }
+            return;
+        }
+
+        if (link && link.dataset.index) {
+            e.preventDefault();
+            const index = parseInt(link.dataset.index, 10);
+            if (!isNaN(index)) {
+                viewSummary(index);
+            }
         }
     });
 });
 
-// For debugging
 window.addEventListener('unhandledrejection', event => {
     console.error('Unhandled rejection:', event.reason);
 });

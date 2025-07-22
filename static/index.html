@@ -3,22 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
     <title>YouTube TLDR</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com/">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="preconnect" href="https://rsms.me/">
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
     <script type="module" src="https://md-block.verou.me/md-block.js"></script>
 </head>
 <body>
     <div class="app-container">
         <aside id="sidebar">
             <header class="sidebar-header">
-                <button id="new-summary-btn">+ New Summary</button>
+                <button id="new-summary-btn">
+                    <i class="fas fa-plus"></i> New Summary
+                </button>
             </header>
             <section id="saved-summaries-section">
-                <h2>History</h2>
+                <h2><i class="fas fa-history"></i> History</h2>
                 <ul id="saved-summaries-list"></ul>
             </section>
             <footer class="sidebar-footer">
-                <button id="clear-summaries-btn" title="Clear all saved summaries">Clear History</button>
+                <button id="clear-summaries-btn">
+                    <i class="fas fa-trash-alt"></i> Clear History
+                </button>
             </footer>
         </aside>
 
@@ -26,46 +35,60 @@
             <div id="welcome-view">
                 <header>
                     <h1>YouTube TLDR</h1>
-                    <p>Enter a YouTube URL to get a summary.</p>
+                    <p>Enter a YouTube URL to get an AI-generated summary.</p>
                 </header>
                 <form id="summary-form">
                     <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=..." required>
-                    <button type="submit">Summarize</button>
+                    <button type="submit">Summarize <i class="fas fa-arrow-right"></i></button>
                 </form>
                  <details class="settings-details">
-                    <summary>Settings</summary>
-                    <div class="settings-content">
-                        <label for="api-key">Gemini API Key</label>
-                        <input type="password" id="api-key" placeholder="Using key from environment if empty">
+                    <summary><i class="fas fa-cog"></i> Advanced Settings</summary>
+                     <div class="settings-content">
+                         <div>
+                             <label for="api-key">
+                                 <i class="fas fa-key"></i> Gemini API Key
+                             </label>
+                             <input type="password" id="api-key" placeholder="AIzaSy...">
+                         </div>
 
-                        <label for="model">Model</label>
-                        <input type="text" id="model">
+                         <div>
+                             <label for="model">
+                                 <i class="fas fa-brain"></i> Model
+                             </label>
+                             <input type="text" id="model" placeholder="gemini-2.5-flash">
+                         </div>
 
-                        <label for="system-prompt">System Prompt</label>
-                        <textarea id="system-prompt" rows="6"></textarea>
+                         <div>
+                             <label for="system-prompt">
+                                 <i class="fas fa-terminal"></i> System Prompt
+                             </label>
+                             <textarea id="system-prompt" rows="6" placeholder="Enter custom instructions for the AI..."></textarea>
+                         </div>
 
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="dry-run">
-                            <label for="dry-run">Dry Run (skip YouTube and Gemini network calls and show test data)</label>
-                        </div>
-                    </div>
+                         <div class="checkbox-group">
+                             <input type="checkbox" id="dry-run">
+                             <label for="dry-run">
+                                 <i class="fas fa-flask"></i> Dry Run (skip YouTube and Gemini network calls and show test data)
+                             </label>
+                         </div>
+                     </div>
                 </details>
             </div>
 
             <div id="summary-view" class="hidden">
                 <div id="status-container" class="hidden">
-                    <p id="loader">Generating summary...</p>
+                    <p id="loader">Processing video and generating summary...</p>
                     <p id="error-message"></p>
                 </div>
 
                 <div id="summary-container" class="hidden">
-                    <h2 id="summary-title">Summary</h2>
+                    <h2 id="summary-title"><i class="fas fa-file-contract"></i> Summary</h2>
                     <md-block id="summary-output"></md-block>
                 </div>
 
                 <div id="transcript-section" class="hidden">
                     <details id="transcript-details">
-                        <summary>View Raw Transcript</summary>
+                        <summary><i class="fas fa-scroll"></i> View Raw Transcript</summary>
                         <pre id="transcript-text"></pre>
                     </details>
                 </div>
