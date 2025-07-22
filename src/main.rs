@@ -7,7 +7,7 @@ use std::thread;
 use crate::gemini::ask::Gemini;
 use crate::gemini::types::request::SystemInstruction;
 use crate::gemini::types::sessions::Session;
-use crate::subtitle::{get_youtube_transcript, merge_transcript, MergeConfig};
+use crate::subtitle::{get_video_data, merge_transcript, MergeConfig};
 
 #[derive(Deserialize)]
 struct SummarizeRequest {
@@ -21,7 +21,8 @@ struct SummarizeRequest {
 #[derive(Serialize)]
 struct SummarizeResponse {
     summary: String,
-    subtitles: String
+    subtitles: String,
+    video_name: String,
 }
 
 #[derive(Serialize)]
@@ -100,13 +101,13 @@ fn handle_summarize(mut request: Request) {
         }
     };
 
-    let job_handle = thread::spawn(move || -> Result<(String, String), String> {
+    let job_handle = thread::spawn(move || -> Result<(String, String, String), String> {
         if summarize_request.dry_run {
             let test = include_str!("./markdown_test.md").to_string();
-            return Ok((test.clone(), test));
+            return Ok((test.clone(), test, "Dry Run".to_string()));
         }
 
-        let transcript = get_youtube_transcript(&summarize_request.url, "en")
+        let (transcript, video_name) = get_video_data(&summarize_request.url, "en")
             .map_err(|e| format!("Failed to get YouTube transcript: {}", e))?;
 
         let merged_transcript = merge_transcript(&transcript, &MergeConfig {
@@ -126,12 +127,12 @@ fn handle_summarize(mut request: Request) {
             .map_err(|e| format!("Gemini API request failed: {}", e))?
             .get_text("");
 
-        Ok((summary, merged_transcript))
+        Ok((summary, merged_transcript, video_name))
     });
 
     match job_handle.join() {
-        Ok(Ok((summary_text, merged_transcript))) => {
-            let success_response = SummarizeResponse { summary: summary_text, subtitles: merged_transcript };
+        Ok(Ok((summary_text, merged_transcript, video_name))) => {
+            let success_response = SummarizeResponse { summary: summary_text, subtitles: merged_transcript, video_name };
             let json_response = serde_json::to_string(&success_response).unwrap();
 
             let response = Response::from_string(json_response)

@@ -71,13 +71,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const a = document.createElement('a');
                 a.href = '#';
                 a.dataset.index = index;
-                a.title = summary.url;
+                a.title = summary.name;
 
                 const icon = document.createElement('i');
                 icon.className = 'fas fa-file-alt';
 
                 const text = document.createElement('span');
-                text.textContent = summary.url;
+                text.textContent = summary.name;
 
                 a.append(icon, text);
 
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSavedSummaries();
             switchView(true);
             setStatus(false);
-            summaryTitleText.textContent = summary.url;
+            summaryTitleText.textContent = summary.name;
             summaryOutput.mdContent = summary.summary;
             summaryContainer.classList.remove('hidden');
 
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const summaryToDelete = summaries[indexToDelete];
         if (!summaryToDelete) return;
 
-        if (confirm(`Are you sure you want to delete the summary for "${summaryToDelete.url}"?`)) {
+        if (confirm(`Are you sure you want to delete the summary for "${summaryToDelete.name}"?`)) {
             summaries.splice(indexToDelete, 1);
 
             if (activeSummaryIndex === indexToDelete) {
@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             setStatus(false);
-            summaryTitleText.textContent = url;
+            summaryTitleText.textContent = data.video_name;
             summaryOutput.mdContent = data.summary;
             summaryContainer.classList.remove('hidden');
 
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const summaries = getSummaries();
-            summaries.unshift({ url: url, summary: data.summary, transcript: data.subtitles });
+            summaries.unshift({ name: data.video_name, summary: data.summary, transcript: data.subtitles });
             saveSummaries(summaries);
             activeSummaryIndex = 0;
             renderSavedSummaries();

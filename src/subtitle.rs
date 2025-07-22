@@ -50,11 +50,18 @@ struct TextEntry {
     content: String,
 }
 
-pub fn get_youtube_transcript(video_url: &str, language: &str) -> Result<Vec<TranscriptEntry>, Box<dyn Error>> {
+pub fn get_video_data(video_url: &str, language: &str) -> Result<(Vec<TranscriptEntry>, String), Box<dyn Error>> {
     let video_id = extract_video_id(video_url)?;
     let res = minreq::get(format!("https://youtu.be/{}", video_id)).send()?;
     let html = res.as_str()?;
     
+    let transcript = get_youtube_transcript(html, &video_id, language)?;
+    let video_name = get_video_name(html).unwrap_or("Unknown Title".to_string());
+
+    Ok((transcript, video_name))
+}
+
+fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<Vec<TranscriptEntry>, Box<dyn Error>> {
     let api_key = html.split(r#""INNERTUBE_API_KEY":""#)
         .nth(1)
         .and_then(|s| s.split('"').next())
@@ -99,6 +106,18 @@ pub fn get_youtube_transcript(video_url: &str, language: &str) -> Result<Vec<Tra
         .collect();
 
     Ok(transcript)
+}
+
+fn get_video_name(html: &str) -> Option<String> {
+    let meta_title_start_tag = r#"<meta name="title" content=""#;
+    
+    let start_index = html.find(meta_title_start_tag)?;
+    
+    let content_start_index = start_index + meta_title_start_tag.len();
+    
+    let end_index = html[content_start_index..].find("\">")?;
+    
+    Some(html[content_start_index..(content_start_index + end_index)].to_string())
 }
 
 pub struct MergeConfig {
