@@ -681,6 +681,46 @@
         white-space: pre-wrap;
         word-wrap: break-word;
     }
+
+    #status-container {
+        padding: 3rem 0;
+        text-align: center;
+    }
+
+    #loader {
+        /* display is managed by script.js */
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        border: 5px solid var(--surface-3);
+        border-top-color: var(--primary-color);
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    #error-message {
+        color: var(--error-color);
+        font-weight: 500;
+        background-color: oklch(65% 0.22 25 / 0.1);
+        padding: 1rem 1.5rem;
+        border-radius: var(--border-radius-md);
+        border: 1px solid oklch(65% 0.22 25 / 0.3);
+        /* display is managed by script.js */
+    }
 }
 
 @layer utilities {
