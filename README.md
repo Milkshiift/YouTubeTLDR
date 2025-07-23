@@ -5,8 +5,8 @@
 
 <div align="center">
 <h3>⚡ A lightweight, self-hosted YouTube video summarizer with Gemini AI</h3>
-<img src="/assets/mainScreenshot.png" width="500" alt="New summary page screenshot">
-<img src="/assets/summaryScreenshot.png" width="500" alt="Summary screenshot">
+<img src="/assets/mainScreenshot.png" width="400" alt="New summary page screenshot">
+<img src="/assets/summaryScreenshot.png" width="400" alt="Summary screenshot">
 </div>
 
 ## ✨ Features
