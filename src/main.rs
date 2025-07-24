@@ -3,7 +3,7 @@ mod subtitle;
 
 use tiny_http::{Server, Response, Request, StatusCode, Header};
 use serde::{Deserialize, Serialize};
-use std::thread;
+use std::{env, thread};
 use crate::gemini::ask::Gemini;
 use crate::gemini::types::request::SystemInstruction;
 use crate::gemini::types::sessions::Session;
@@ -33,8 +33,11 @@ struct ErrorResponse {
 
 
 fn main() {
-    let server = Server::http("0.0.0.0:8000").unwrap();
-    println!("✅ Server started at http://localhost:8000");
+    let ip = env::var("TLDR_IP").unwrap_or("0.0.0.0".to_string());
+    let port = env::var("TLDR_PORT").unwrap_or("8000".to_string());
+    let addr = format!("{ip}:{port}");
+    let server = Server::http(&addr).unwrap();
+    println!("✅ Server started at http://{addr}");
 
     for request in server.incoming_requests() {
         let url = request.url();

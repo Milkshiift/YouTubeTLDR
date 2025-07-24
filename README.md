@@ -49,6 +49,8 @@ YouTubeTLDR embraces simplicity — maximum functionality with minimal overhead.
 4.  Click "Advanced Settings" and enter your API key
 5.  Paste a YouTube URL and click "Summarize"
 
+You can change the IP and port with TLDR_IP and TLDR_PORT environment variables
+
 ## 🔨 Building from Source
 
 1.  Install the **nightly** [Rust toolchain](https://www.rust-lang.org/tools/install)
