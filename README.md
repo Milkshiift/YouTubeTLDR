@@ -5,6 +5,7 @@
 
 <div align="center">
 <h3>⚡ A lightweight, self-hosted YouTube video summarizer with Gemini AI</h3>
+<h4>Demo: <a href="https://youtubetldr.onrender.com/">https://youtubetldr.onrender.com/</a></h4>
 <img src="/assets/mainScreenshot.png" width="400" alt="New summary page screenshot">
 <img src="/assets/summaryScreenshot.png" width="400" alt="Summary screenshot">
 </div>
