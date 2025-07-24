@@ -65,6 +65,8 @@ You can change the IP and port with TLDR_IP and TLDR_PORT environment variables
     ```
 4.  Find your executable at `target/release/YouTubeTLDR`
 
+By default, the native TLS implementation (like openssl) is used. If you want to use rustls build with `--no-default-features --features rustls-tls`
+
 ---
 
 <sup>1</sup> The demo requires an API key, which is used once per request by the backend for summarization and is **never stored**. It runs directly from the `master` branch's Dockerfile.
