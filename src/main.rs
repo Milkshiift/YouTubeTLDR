@@ -114,7 +114,7 @@ fn handle_summarize(mut request: Request) {
             .map_err(|e| format!("Failed to get YouTube transcript: {}", e))?;
 
         let merged_transcript = merge_transcript(&transcript, &MergeConfig {
-            paragraph_pause_threshold_secs: 2.0,
+            paragraph_pause_threshold_secs: 1.5,
             remove_annotations: false,
         });
 
