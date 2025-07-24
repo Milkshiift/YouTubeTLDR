@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadSettings() {
         apiKeyInput.value = localStorage.getItem(API_KEY_STORAGE_KEY) || '';
-        modelInput.value = localStorage.getItem(MODEL_STORAGE_KEY) || 'gemini-1.5-flash-latest';
+        modelInput.value = localStorage.getItem(MODEL_STORAGE_KEY) || 'gemini-2.5-flash';
         systemPromptInput.value = localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY) || DEFAULT_SYSTEM_PROMPT;
         dryRunCheckbox.checked = localStorage.getItem(DRY_RUN_STORAGE_KEY) === 'true';
     }
