@@ -8,12 +8,17 @@ readme = "README.md"
 license = "MIT"
 
 [dependencies]
-minreq = { version = "2.14", features = ["json-using-serde", "https-native"] }
+minreq = { version = "2.14", features = ["json-using-serde"] }
 quick-xml = { version = "0.38", features = ["serialize"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tiny_http = "0.12"
 html-escape = "0.2"
+
+[features]
+default = ["native-tls"]
+native-tls = ["minreq/https-native"]
+rustls-tls = ["minreq/https-rustls"]
 
 [profile.release]
 opt-level = 3
