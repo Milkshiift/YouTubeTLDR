@@ -54,9 +54,6 @@ pub fn get_video_data(video_url: &str, language: &str) -> Result<(Vec<Transcript
     let video_id = extract_video_id(video_url)?;
     let res = minreq::get(format!("https://youtu.be/{}", video_id)).send()?;
     let html = res.as_str()?;
-    println!("--- Received HTML ---");
-    println!("{}", html);
-    println!("--- End Received HTML ---");
     
     let transcript = get_youtube_transcript(html, &video_id, language)?;
     let video_name = get_video_name(html).unwrap_or("Unknown Title".to_string());
