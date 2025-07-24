@@ -109,12 +109,15 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
 }
 
 fn get_video_name(html: &str) -> Option<String> {
-    html.split_once(r#"<meta name="title" content=""#)?
-        .1
-        .split_once(r#"">"#)?
-        .0
-        .to_string()
-        .into()
+    let meta_title_start_tag = r#"<meta name="title" content=""#;
+    
+    let start_index = html.find(meta_title_start_tag)?;
+    
+    let content_start_index = start_index + meta_title_start_tag.len();
+    
+    let end_index = html[content_start_index..].find("\">")?;
+    
+    Some(html[content_start_index..(content_start_index + end_index)].to_string())
 }
 
 pub struct MergeConfig {
@@ -142,36 +145,45 @@ pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> St
         return String::new();
     }
 
-    let mut result = String::with_capacity(entries.len() * 40);
-    let mut current_line = String::with_capacity(256);
-
-    let mut last_speech_end_time = entries[0].end_time;
-
-    for (i, entry) in entries.iter().enumerate() {
-        let cleaned_caption = if config.remove_annotations {
-            remove_annotations(&entry.caption)
-        } else {
-            entry.caption.clone()
-        };
-        let cleaned_caption = cleaned_caption.trim();
-
-        if cleaned_caption.is_empty() {
-            continue;
-        }
-
-        if i > 0 {
-            let pause_duration = entry.start_time - last_speech_end_time;
-            if pause_duration >= config.paragraph_pause_threshold_secs {
-                result.push_str(&current_line);
-                result.push_str("\n\n");
-                current_line.clear();
+    let cleaned_entries: Vec<_> = entries.iter()
+        .filter_map(|entry| {
+            let cleaned = if config.remove_annotations {
+                remove_annotations(&entry.caption).trim().to_string()
             } else {
-                current_line.push(' ');
+                entry.caption.trim().to_string()
+            };
+
+            if cleaned.is_empty() {
+                None
+            } else {
+                Some((entry.start_time, entry.end_time, cleaned))
             }
+        })
+        .collect();
+
+    if cleaned_entries.is_empty() {
+        return String::new();
+    }
+
+    let mut result = String::new();
+    let mut current_line = cleaned_entries[0].2.clone();
+    let mut last_speech_end_time = cleaned_entries[0].1;
+
+    for i in 1..cleaned_entries.len() {
+        let (current_start, current_end, current_text) = &cleaned_entries[i];
+
+        let pause_duration = *current_start - last_speech_end_time;
+
+        if pause_duration >= config.paragraph_pause_threshold_secs {
+            result.push_str(&current_line);
+            result.push_str("\n\n");
+            current_line = current_text.clone();
+        } else {
+            current_line.push(' ');
+            current_line.push_str(current_text);
         }
 
-        current_line.push_str(cleaned_caption);
-        last_speech_end_time = last_speech_end_time.max(entry.end_time);
+        last_speech_end_time = last_speech_end_time.max(*current_end);
     }
 
     result.push_str(&current_line);
