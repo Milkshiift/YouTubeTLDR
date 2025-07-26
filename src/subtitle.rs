@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use html_escape::decode_html_entities;
 
@@ -9,25 +9,25 @@ pub struct TranscriptEntry {
     pub end_time: f32,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PlayerDataResponse {
     captions: Option<Captions>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Captions {
     player_captions_tracklist_renderer: Option<PlayerCaptionsTracklistRenderer>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PlayerCaptionsTracklistRenderer {
     caption_tracks: Vec<CaptionTrack>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CaptionTrack {
     base_url: String,
@@ -86,6 +86,8 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
         }))?
         .send()?
         .json::<PlayerDataResponse>()?;
+    
+    println!("{}", serde_json::to_string_pretty(&player_data_response).unwrap());
     
     let track = player_data_response
         .captions
