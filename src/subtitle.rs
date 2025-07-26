@@ -145,7 +145,7 @@ fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(Vec<Trans
     
     let video_title = player_data_response
         .video_details
-        .ok_or("Video details not found in API response")?
+        .ok_or("Video details not found in API response. Server IP likely blocked by YouTube.")?
         .title;
     
     let tracks = player_data_response
