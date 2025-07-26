@@ -5,7 +5,9 @@
 
 <div align="center">
 <h3>⚡ A lightweight, self-hosted YouTube video summarizer with Gemini AI<br>
-<sub>Demo: <a href="https://youtubetldr.onrender.com/">https://youtubetldr.onrender.com/</a><sup>1</sup> (doesn't work right now because YouTube blocked Render's IP)</sub></h3>
+Demo: <a href="https://youtubetldr.onrender.com/">https://youtubetldr.onrender.com/</a> <sup>1</sup> 
+<br> 
+<sup><sup>1</sup>Actual summarization doesn't work because YouTube blocks server IP</sup></h3>
 <img src="/assets/mainScreenshot.png" width="400" alt="New summary page screenshot">
 <img src="/assets/summaryScreenshot.png" width="400" alt="Summary screenshot">
 </div>
@@ -65,7 +67,3 @@ You can change the IP and port with TLDR_IP and TLDR_PORT environment variables
 4.  Find your executable at `target/release/YouTubeTLDR`
 
 By default, the native TLS implementation (like openssl) is used. If you want to use rustls build with `--no-default-features --features rustls-tls`
-
----
-
-<sup>1</sup> The demo requires an API key, which is used once per request by the backend for summarization and is **never stored**. It runs directly from the `master` branch's Dockerfile.
