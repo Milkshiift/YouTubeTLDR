@@ -68,7 +68,7 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
     let api_key = html.split(r#""INNERTUBE_API_KEY":""#)
         .nth(1)
         .and_then(|s| s.split('"').next())
-        .ok_or("INNERTUBE_API_KEY not found. YouTube likely blocked the server ip.")?;
+        .unwrap_or("AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8");
     
     let player_url = format!("https://www.youtube.com/youtubei/v1/player?key={api_key}");
 
