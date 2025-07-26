@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use html_escape::decode_html_entities;
+use html_escape::{decode_html_entities, decode_html_entities_to_string};
 
 #[derive(Debug, Deserialize)]
 pub struct TranscriptEntry {
@@ -59,7 +59,7 @@ pub fn get_video_data(video_url: &str, language: &str) -> Result<(Vec<Transcript
     let html = res.as_str()?;
     
     let transcript = get_youtube_transcript(html, &video_id, language)?;
-    let video_name = get_video_name(html).unwrap_or("Unknown Title".to_string());
+    let video_name = decode_html_entities(&get_video_name(html).unwrap_or("Unknown Title".to_string())).to_string();
 
     Ok((transcript, video_name))
 }
@@ -86,7 +86,7 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
         }))?
         .send()?
         .json::<PlayerDataResponse>()?;
-    
+
     println!("{}", serde_json::to_string_pretty(&player_data_response).unwrap());
     
     let track = player_data_response
