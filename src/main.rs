@@ -4,7 +4,7 @@ mod subtitle;
 use crate::gemini::ask::Gemini;
 use crate::gemini::types::request::SystemInstruction;
 use crate::gemini::types::sessions::Session;
-use crate::subtitle::{get_video_data, merge_transcript, MergeConfig};
+use crate::subtitle::{get_video_data};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::sync::{mpsc, Arc, Mutex};
@@ -161,18 +161,11 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
 
     let (transcript, video_name) = get_video_data(&req.url, "en")
         .map_err(|e| format!("Failed to get YouTube transcript: {e}"))?;
-
-    let merged_transcript = merge_transcript(
-        &transcript,
-        &MergeConfig {
-            paragraph_pause_threshold_secs: 1.0,
-        },
-    );
     
     if req.transcript_only {
         return Ok(SummarizeResponse {
-            summary: merged_transcript.clone(),
-            subtitles: merged_transcript,
+            summary: transcript.clone(),
+            subtitles: transcript,
             video_name,
         });
     }
@@ -183,7 +176,7 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
 
     let gemini = Gemini::new(&api_key, model, Some(SystemInstruction::from_str(&system_prompt)));
     let mut session = Session::new(2);
-    session.ask_string(merged_transcript.clone());
+    session.ask_string(transcript.clone());
 
     let summary = gemini
         .ask(&mut session)
@@ -192,7 +185,7 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
 
     Ok(SummarizeResponse {
         summary,
-        subtitles: merged_transcript,
+        subtitles: transcript,
         video_name,
     })
 }

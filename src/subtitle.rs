@@ -2,17 +2,6 @@ use serde::{Deserialize};
 use std::error::Error;
 
 
-#[derive(Debug, Deserialize)]
-pub struct TranscriptEntry {
-    pub caption: String,
-    pub start_time: f32,
-    pub end_time: f32,
-}
-
-pub struct MergeConfig {
-    pub paragraph_pause_threshold_secs: f32,
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PlayerDataResponse {
@@ -53,10 +42,6 @@ struct JsonCaptionResponse {
 #[serde(untagged)]
 enum JsonCaptionEvent {
     CaptionEvent {
-        #[serde(rename = "tStartMs")]
-        start_ms: u64,
-        #[serde(rename = "dDurationMs")]
-        duration_ms: u64,
         segs: Option<Vec<CaptionSegment>>,
     },
     MetadataEvent {
@@ -76,51 +61,17 @@ const YOUTUBE_REFERER: &str = "https://www.youtube.com/";
 const YOUTUBE_BASE_URL: &str = "https://www.youtube.com";
 
 
-pub fn get_video_data(video_url: &str, language: &str) -> Result<(Vec<TranscriptEntry>, String), Box<dyn Error>> {
+pub fn get_video_data(video_url: &str, language: &str) -> Result<(String, String), Box<dyn Error>> {
     let video_id = extract_video_id(video_url)
         .ok_or_else(|| format!("Invalid or unsupported YouTube URL: {}", video_url))?;
-    
+
     let (transcript, video_name) = get_transcript_and_title(&video_id, language)?;
 
     Ok((transcript, video_name))
 }
 
-pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> String {
-    if entries.is_empty() {
-        return String::new();
-    }
 
-    let mut result = String::with_capacity(entries.len() * 40);
-    let mut current_line = String::with_capacity(256);
-    let mut last_speech_end_time = entries[0].start_time;
-
-    for entry in entries {
-        let cleaned_caption = entry.caption.trim();
-        if cleaned_caption.is_empty() {
-            continue;
-        }
-
-        let pause_duration = entry.start_time - last_speech_end_time;
-        if !current_line.is_empty() {
-            if pause_duration >= config.paragraph_pause_threshold_secs {
-                result.push_str(&current_line);
-                result.push_str("\n\n");
-                current_line.clear();
-            } else {
-                current_line.push(' ');
-            }
-        }
-
-        current_line.push_str(cleaned_caption);
-        last_speech_end_time = last_speech_end_time.max(entry.end_time);
-    }
-
-    result.push_str(&current_line);
-    result
-}
-
-
-fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(Vec<TranscriptEntry>, String), Box<dyn Error>> {
+fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(String, String), Box<dyn Error>> {
     let api_key = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 
     let player_url = format!("{}/youtubei/v1/player?key={}", YOUTUBE_BASE_URL, api_key);
@@ -139,12 +90,12 @@ fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(Vec<Trans
         }))?
         .send()?
         .json::<PlayerDataResponse>()?;
-    
+
     let video_title = player_data_response
         .video_details
         .ok_or("Video details not found in API response. Server IP likely blocked by YouTube.")?
         .title;
-    
+
     let tracks = player_data_response
         .captions
         .and_then(|c| c.player_captions_tracklist_renderer)
@@ -160,9 +111,9 @@ fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(Vec<Trans
     let json_response: JsonCaptionResponse = serde_json::from_str(caption_json_str)
         .map_err(|e| format!("Failed to parse captions JSON: {}\nResponse: {}", e, caption_json_str))?;
 
-    let transcript_entries = process_json_captions(json_response.events);
+    let transcript = process_json_captions(json_response.events);
 
-    Ok((transcript_entries, video_title))
+    Ok((transcript, video_title))
 }
 
 fn extract_video_id(url: &str) -> Option<String> {
@@ -215,33 +166,28 @@ fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&
         .ok_or_else(|| format!("No suitable captions found for language '{}'", language).into())
 }
 
-fn process_json_captions(events: Vec<JsonCaptionEvent>) -> Vec<TranscriptEntry> {
+fn process_json_captions(events: Vec<JsonCaptionEvent>) -> String {
     events
         .into_iter()
         .filter_map(|event| {
-            let (start_ms, duration_ms, segs) = match event {
-                JsonCaptionEvent::CaptionEvent { start_ms, duration_ms, segs: Some(segs) } => {
-                    (start_ms, duration_ms, segs)
+            match event {
+                JsonCaptionEvent::CaptionEvent { segs: Some(segs), .. } => {
+                    let caption_text: String = segs
+                        .iter()
+                        .map(|s| s.utf8.trim())
+                        .filter(|s| !s.is_empty())
+                        .collect::<Vec<&str>>()
+                        .join(" ");
+
+                    if caption_text.is_empty() {
+                        None
+                    } else {
+                        Some(caption_text)
+                    }
                 }
-                _ => return None,
-            };
-
-            let caption_text: String = segs
-                .iter()
-                .map(|s| s.utf8.trim())
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<&str>>()
-                .join(" ");
-
-            if caption_text.is_empty() {
-                return None;
+                _ => None,
             }
-
-            Some(TranscriptEntry {
-                caption: caption_text,
-                start_time: start_ms as f32 / 1000.0,
-                end_time: (start_ms + duration_ms) as f32 / 1000.0,
-            })
         })
-        .collect()
+        .collect::<Vec<String>>()
+        .join(" ")
 }
