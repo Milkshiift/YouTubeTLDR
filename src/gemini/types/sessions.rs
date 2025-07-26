@@ -38,12 +38,11 @@ impl Session {
         self.remember_reply
     }
     fn add_chat(&mut self, mut chat: Chat) -> &mut Self {
-        if let Some(last_chat) = self.history.back_mut() {
-            if discriminant(&last_chat.role) == discriminant(&chat.role) {
+        if let Some(last_chat) = self.history.back_mut()
+            && discriminant(&last_chat.role) == discriminant(&chat.role) {
                 last_chat.parts.append(&mut chat.parts);
                 return self;
             }
-        }
 
         self.history.push_back(chat);
         self.chat_no += 1;
@@ -63,11 +62,10 @@ impl Session {
             self.add_chat(Chat::new(Role::model, reply_parts.clone()));
             Some(reply_parts)
         } else {
-            if let Some(chat) = self.history.back() {
-                if let Role::user = chat.role {
+            if let Some(chat) = self.history.back()
+                && let Role::user = chat.role {
                     self.history.pop_back();
                 }
-            }
             None
         }
     }

@@ -52,7 +52,7 @@ struct TextEntry {
 
 pub fn get_video_data(video_url: &str, language: &str) -> Result<(Vec<TranscriptEntry>, String), Box<dyn Error>> {
     let video_id = extract_video_id(video_url)?;
-    let res = minreq::get(format!("https://youtu.be/{}", video_id))
+    let res = minreq::get(format!("https://youtu.be/{video_id}"))
         .with_header("Referer", "https://www.youtube.com/")
         .with_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.3")
         .send()?;
@@ -70,7 +70,7 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
         .and_then(|s| s.split('"').next())
         .ok_or("INNERTUBE_API_KEY not found. YouTube likely blocked the server ip.")?;
     
-    let player_url = format!("https://www.youtube.com/youtubei/v1/player?key={}", api_key);
+    let player_url = format!("https://www.youtube.com/youtubei/v1/player?key={api_key}");
 
     let player_data_response = minreq::post(&player_url)
         .with_header("Referer", "https://www.youtube.com/")
@@ -92,7 +92,7 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
         .as_ref()
         .and_then(|c| c.player_captions_tracklist_renderer.as_ref())
         .and_then(|r| r.caption_tracks.iter().find(|t| t.language_code == language))
-        .ok_or_else(|| format!("No captions found for language: {}", language))?;
+        .ok_or_else(|| format!("No captions found for language: {language}"))?;
     
     let res = minreq::get(&track.base_url).send()?; 
     let xml = res.as_bytes();
@@ -199,5 +199,5 @@ fn extract_video_id(url: &str) -> Result<String, Box<dyn Error>> {
     if let Some(id) = url.split("youtu.be/").nth(1) {
         return Ok(id.chars().take(11).collect());
     }
-    Err(format!("Invalid YouTube URL: {}", url).into())
+    Err(format!("Invalid YouTube URL: {url}").into())
 }

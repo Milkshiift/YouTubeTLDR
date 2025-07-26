@@ -65,7 +65,7 @@ fn main() {
                     }
                     Err(_) => {
                         // The channel has closed, so the main thread has shut down.
-                        println!("   Worker {} shutting down.", id);
+                        println!("   Worker {id} shutting down.");
                         break;
                     }
                 }
@@ -75,10 +75,10 @@ fn main() {
 
     println!("▶️ Ready to accept requests.");
     for request in server.incoming_requests() {
-        let is_static_and_get = match (request.method(), request.url()) {
-            (Method::Get, "/") | (Method::Get, "/index.html") | (Method::Get, "/style.css") | (Method::Get, "/script.js") => true,
-            _ => false,
-        };
+        let is_static_and_get = matches!(
+            (request.method(), request.url()), 
+            (Method::Get, "/") | (Method::Get, "/index.html") | (Method::Get, "/style.css") | (Method::Get, "/script.js")
+        );
 
         if is_static_and_get {
             // Handle static requests on the main thread since they are fast
@@ -121,7 +121,7 @@ fn handle_summarize(mut request: Request) {
     let summarize_request: SummarizeRequest = match serde_json::from_str(&body) {
         Ok(req) => req,
         Err(e) => {
-            respond_with_error(request, &format!("Invalid JSON: {}", e), StatusCode(400));
+            respond_with_error(request, &format!("Invalid JSON: {e}"), StatusCode(400));
             return;
         }
     };
@@ -138,11 +138,11 @@ fn handle_summarize(mut request: Request) {
                 .with_status_code(200);
 
             if let Err(e) = request.respond(response) {
-                eprintln!("⚠️ Could not send success response: {}", e);
+                eprintln!("⚠️ Could not send success response: {e}");
             }
         }
         Err(error_message) => {
-            eprintln!("Worker failed with error: {}", error_message);
+            eprintln!("Worker failed with error: {error_message}");
             respond_with_error(request, &error_message, StatusCode(500));
         }
     }
@@ -159,7 +159,7 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
     }
 
     let (transcript, video_name) = get_video_data(&req.url, "en")
-        .map_err(|e| format!("Failed to get YouTube transcript: {}", e))?;
+        .map_err(|e| format!("Failed to get YouTube transcript: {e}"))?;
 
     let merged_transcript = merge_transcript(
         &transcript,
@@ -179,7 +179,7 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
 
     let summary = gemini
         .ask(&mut session)
-        .map_err(|e| format!("Gemini API request failed: {}", e))?
+        .map_err(|e| format!("Gemini API request failed: {e}"))?
         .get_text("");
 
     Ok(SummarizeResponse {
@@ -195,7 +195,7 @@ fn serve_static(request: Request, content: &'static str, content_type: &'static 
     let response = Response::from_string(content).with_header(header);
 
     if let Err(e) = request.respond(response) {
-        eprintln!("⚠️ Could not send static file response: {}", e);
+        eprintln!("⚠️ Could not send static file response: {e}");
     }
 }
 
@@ -213,6 +213,6 @@ fn respond_with_error(request: Request, message: &str, status_code: StatusCode) 
         .with_status_code(status_code);
 
     if let Err(e) = request.respond(response) {
-        eprintln!("⚠️ Could not send error response: {}", e);
+        eprintln!("⚠️ Could not send error response: {e}");
     }
 }
