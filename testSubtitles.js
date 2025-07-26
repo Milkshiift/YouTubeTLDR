@@ -20,13 +20,15 @@ async function getYoutubeTranscript(videoId, language = "en") {
         body: JSON.stringify({
             context: {
                 client: {
-                    clientName: "ANDROID",
-                    clientVersion: "20.10.38"
+                    clientName: "WEB",
+                    clientVersion: "2.20240401.01.00"
                 }
             },
             videoId
         })
     }).then(res => res.json());
+
+    console.log(playerData);
 
     const tracks = playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
     if (!tracks) throw new Error("No captions found.");

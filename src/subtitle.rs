@@ -14,11 +14,16 @@ pub struct MergeConfig {
     pub paragraph_pause_threshold_secs: f32,
 }
 
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PlayerDataResponse {
     captions: Option<Captions>,
+    video_details: Option<VideoDetails>,
+}
+
+#[derive(Deserialize)]
+struct VideoDetails {
+    title: String,
 }
 
 #[derive(Deserialize)]
@@ -75,18 +80,10 @@ const YOUTUBE_BASE_URL: &str = "https://www.youtube.com";
 pub fn get_video_data(video_url: &str, language: &str) -> Result<(Vec<TranscriptEntry>, String), Box<dyn Error>> {
     let video_id = extract_video_id(video_url)
         .ok_or_else(|| format!("Invalid or unsupported YouTube URL: {}", video_url))?;
-
-    let video_page_url = format!("https://youtu.be/{}", video_id);
-    let res = minreq::get(&video_page_url)
-        .with_header("User-Agent", USER_AGENT)
-        .with_header("Referer", YOUTUBE_REFERER)
-        .send()?;
-    let html = res.as_str()?;
-
-    let transcript = get_youtube_transcript(html, &video_id, language)?;
-    let video_name = get_video_name(html)
-        .ok_or("Failed to parse video title from HTML")?;
-    let decoded_video_name = decode_html_entities(video_name).into_owned();
+    
+    let (transcript, video_name) = get_transcript_and_title(&video_id, language)?;
+    
+    let decoded_video_name = decode_html_entities(&video_name).into_owned();
 
     Ok((transcript, decoded_video_name))
 }
@@ -126,12 +123,8 @@ pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> St
 }
 
 
-fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<Vec<TranscriptEntry>, Box<dyn Error>> {
-    let api_key = html
-        .split_once(r#""INNERTUBE_API_KEY":""#)
-        .and_then(|(_, rest)| rest.split_once('"'))
-        .map(|(key, _)| key)
-        .ok_or("Failed to parse INNERTUBE_API_KEY from HTML")?;
+fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(Vec<TranscriptEntry>, String), Box<dyn Error>> {
+    let api_key = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 
     let player_url = format!("{}/youtubei/v1/player?key={}", YOUTUBE_BASE_URL, api_key);
 
@@ -142,19 +135,24 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
             "context": {
                 "client": {
                     "clientName": "WEB",
-                    "clientVersion": "2.20240401.01.00"
+                    "clientVersion": "2.20250626.01.00"
                 }
             },
             "videoId": video_id
         }))?
         .send()?
         .json::<PlayerDataResponse>()?;
-
+    
+    let video_title = player_data_response
+        .video_details
+        .ok_or("Video details not found in API response")?
+        .title;
+    
     let tracks = player_data_response
         .captions
         .and_then(|c| c.player_captions_tracklist_renderer)
         .map(|r| r.caption_tracks)
-        .ok_or_else(|| format!("No captions found for language: {}", language))?;
+        .ok_or_else(|| format!("No captions found for video ID: {}", video_id))?;
 
     let track = select_best_track(&tracks, language)?;
     let captions_url = format_captions_url(&track.base_url);
@@ -165,7 +163,9 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
     let json_response: JsonCaptionResponse = serde_json::from_str(caption_json_str)
         .map_err(|e| format!("Failed to parse captions JSON: {}\nResponse: {}", e, caption_json_str))?;
 
-    Ok(process_json_captions(json_response.events))
+    let transcript_entries = process_json_captions(json_response.events);
+
+    Ok((transcript_entries, video_title))
 }
 
 fn extract_video_id(url: &str) -> Option<String> {
@@ -177,13 +177,6 @@ fn extract_video_id(url: &str) -> Option<String> {
         .or_else(|| url.split_once("/shorts/"))
         .or_else(|| url.split_once("youtu.be/"))
         .map(|(_, after)| extract_id(after))
-}
-
-fn get_video_name(html: &str) -> Option<&str> {
-    Some(html.split_once(r#"<meta name="title" content=""#)?
-        .1
-        .split_once(r#"">"#)?
-        .0)
 }
 
 fn format_captions_url(base_url: &str) -> String {
@@ -199,18 +192,18 @@ fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&
     for track in tracks {
         if track.language_code == language {
             let url = &track.base_url;
-            
+
             if !url.contains("kind=asr") {
                 manual_track = Some(track);
                 break;
             }
-            
+
             if url.contains("variant=punctuated") {
                 if punctuated_asr_track.is_none() {
                     punctuated_asr_track = Some(track);
                 }
             }
-                
+
             else {
                 if plain_asr_track.is_none() {
                     plain_asr_track = Some(track);
@@ -218,7 +211,7 @@ fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&
             }
         }
     }
-    
+
     manual_track
         .or(punctuated_asr_track)
         .or(plain_asr_track)
