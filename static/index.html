@@ -14,10 +14,16 @@
 </head>
 <body>
     <div class="app-container">
+        <button id="menu-toggle-btn" title="Toggle Menu">
+            <i class="fas fa-bars"></i>
+        </button>
         <aside id="sidebar">
             <header class="sidebar-header">
                 <button id="new-summary-btn">
                     <i class="fas fa-plus"></i> New Summary
+                </button>
+                <button id="close-sidebar-btn" class="icon-btn" title="Close Menu">
+                    <i class="fas fa-times"></i>
                 </button>
             </header>
             <section id="saved-summaries-section">
@@ -113,6 +119,7 @@
                 </div>
             </div>
         </main>
+        <div id="sidebar-overlay"></div>
     </div>
 
     <script src="script.js"></script>

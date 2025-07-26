@@ -32,6 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const copySummaryBtn = document.getElementById('copy-summary-btn');
     const copyTranscriptBtn = document.getElementById('copy-transcript-btn');
 
+    const menuToggleBtn = document.getElementById('menu-toggle-btn');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+
     const baseURL = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
 
     const API_KEY_STORAGE_KEY = 'youtube-tldr-api-key';
@@ -113,6 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 transcriptSection.classList.add('hidden');
             }
+
+            if (isMobile()) {
+                toggleSidebar(false);
+            }
         }
     }
 
@@ -170,6 +178,27 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryContainer.classList.add('hidden');
             transcriptSection.classList.add('hidden');
         }
+    }
+
+    function isMobile() {
+        return window.innerWidth <= 800;
+    }
+
+    function toggleSidebar(force) {
+        document.body.classList.toggle('sidebar-open', force);
+        if (menuToggleBtn) {
+            menuToggleBtn.setAttribute('aria-expanded', String(document.body.classList.contains('sidebar-open')));
+        }
+    }
+
+    if (menuToggleBtn) {
+        menuToggleBtn.addEventListener('click', () => toggleSidebar());
+    }
+    if (closeSidebarBtn) {
+        closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
+    }
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
     }
 
     async function summarize(event) {
@@ -236,6 +265,9 @@ document.addEventListener('DOMContentLoaded', () => {
         urlInput.value = '';
         renderSavedSummaries();
         switchView(false);
+        if (isMobile()) {
+            toggleSidebar(false);
+        }
     });
 
     savedSummariesList.addEventListener('click', (e) => {
