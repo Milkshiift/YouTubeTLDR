@@ -50,7 +50,8 @@ Note: This server is optimized for personal use and utilizes a multithreaded wor
 4.  Click "Advanced Settings" and enter your API key
 5.  Paste a YouTube URL and click "Summarize"
 
-You can change the IP and port with TLDR_IP and TLDR_PORT environment variables
+You can change the IP and port with `TLDR_IP` and `TLDR_PORT` environment variables.    
+The amount of workers can be changed with `TLDR_WORKERS`, set it to the amount of concurrent users you expect.
 
 ## 🔨 Building from Source
 
