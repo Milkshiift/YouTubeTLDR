@@ -5,7 +5,7 @@
 
 <div align="center">
 <h3>⚡ A lightweight, self-hosted YouTube video summarizer with Gemini AI<br>
-<sub>Demo: <a href="https://youtubetldr.onrender.com/">https://youtubetldr.onrender.com/</a><sup>1</sup> (doen't work right now because of Google's captcha for Render's IP)</sub></h3>
+<sub>Demo: <a href="https://youtubetldr.onrender.com/">https://youtubetldr.onrender.com/</a><sup>1</sup> (doesn't work right now because YouTube blocked Render's IP)</sub></h3>
 <img src="/assets/mainScreenshot.png" width="400" alt="New summary page screenshot">
 <img src="/assets/summaryScreenshot.png" width="400" alt="Summary screenshot">
 </div>
@@ -29,9 +29,7 @@ YouTubeTLDR embraces simplicity — maximum functionality with minimal overhead.
 *   🔑 **BYOK:** Bring Your Own Key. Uses your Google Gemini API directly — no proxies, no data collection
 *   🎯 **Single Purpose:** Just generates and saves summaries, that's it
 
-> If you would prefer more features, [this project](https://github.com/DevRico003/youtube_summarizer) seems to do it well.
-
-**⚠️ Note:** The project is built for a single user. It uses a synchronous threading approach that doesn't scale well to many simultaneous users.
+Note: This server is optimized for personal use and utilizes a multithreaded worker pool for concurrency. It is not designed to support hundreds of concurrent users.
 
 ## 🚀 Getting Started
 
