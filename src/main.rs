@@ -165,8 +165,7 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
     let merged_transcript = merge_transcript(
         &transcript,
         &MergeConfig {
-            paragraph_pause_threshold_secs: 1.5,
-            remove_annotations: false,
+            paragraph_pause_threshold_secs: 1.0,
         },
     );
     

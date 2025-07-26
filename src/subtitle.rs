@@ -1,6 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use std::error::Error;
-use html_escape::{decode_html_entities, decode_html_entities_to_string};
+use html_escape::decode_html_entities;
+
 
 #[derive(Debug, Deserialize)]
 pub struct TranscriptEntry {
@@ -9,162 +10,85 @@ pub struct TranscriptEntry {
     pub end_time: f32,
 }
 
-#[derive(Serialize, Deserialize)]
+pub struct MergeConfig {
+    pub paragraph_pause_threshold_secs: f32,
+}
+
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PlayerDataResponse {
     captions: Option<Captions>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Captions {
     player_captions_tracklist_renderer: Option<PlayerCaptionsTracklistRenderer>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PlayerCaptionsTracklistRenderer {
     caption_tracks: Vec<CaptionTrack>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CaptionTrack {
     base_url: String,
     language_code: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct Transcript {
-    #[serde(rename = "text", default)]
-    text: Vec<TextEntry>,
+#[derive(Deserialize)]
+struct JsonCaptionResponse {
+    events: Vec<JsonCaptionEvent>,
 }
 
-#[derive(Debug, Deserialize)]
-struct TextEntry {
-    #[serde(rename = "@start")]
-    start: f32,
-    #[serde(rename = "@dur")]
-    dur: f32,
-    #[serde(rename = "$value")]
-    content: String,
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum JsonCaptionEvent {
+    CaptionEvent {
+        #[serde(rename = "tStartMs")]
+        start_ms: u64,
+        #[serde(rename = "dDurationMs")]
+        duration_ms: u64,
+        segs: Option<Vec<CaptionSegment>>,
+    },
+    MetadataEvent {
+        #[serde(flatten)]
+        _extra: serde_json::Value,
+    },
 }
+
+#[derive(Deserialize)]
+struct CaptionSegment {
+    utf8: String,
+}
+
+
+const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const YOUTUBE_REFERER: &str = "https://www.youtube.com/";
+const YOUTUBE_BASE_URL: &str = "https://www.youtube.com";
+
 
 pub fn get_video_data(video_url: &str, language: &str) -> Result<(Vec<TranscriptEntry>, String), Box<dyn Error>> {
-    let video_id = extract_video_id(video_url)?;
-    let res = minreq::get(format!("https://youtu.be/{video_id}"))
-        .with_header("Referer", "https://www.youtube.com/")
-        .with_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.3")
+    let video_id = extract_video_id(video_url)
+        .ok_or_else(|| format!("Invalid or unsupported YouTube URL: {}", video_url))?;
+
+    let video_page_url = format!("https://youtu.be/{}", video_id);
+    let res = minreq::get(&video_page_url)
+        .with_header("User-Agent", USER_AGENT)
+        .with_header("Referer", YOUTUBE_REFERER)
         .send()?;
     let html = res.as_str()?;
-    
+
     let transcript = get_youtube_transcript(html, &video_id, language)?;
-    let video_name = decode_html_entities(&get_video_name(html).unwrap_or("Unknown Title".to_string())).to_string();
+    let video_name = get_video_name(html)
+        .ok_or("Failed to parse video title from HTML")?;
+    let decoded_video_name = decode_html_entities(video_name).into_owned();
 
-    Ok((transcript, video_name))
-}
-
-fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<Vec<TranscriptEntry>, Box<dyn Error>> {
-    let api_key = html.split(r#""INNERTUBE_API_KEY":""#)
-        .nth(1)
-        .and_then(|s| s.split('"').next())
-        .unwrap_or("AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8");
-    
-    let player_url = format!("https://www.youtube.com/youtubei/v1/player?key={api_key}");
-
-    let player_data_response = minreq::post(&player_url)
-        .with_header("Referer", "https://www.youtube.com/")
-        .with_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.3")
-        .with_json(&serde_json::json!({
-            "context": {
-                "client": {
-                    "clientName": "WEB",
-                    "clientVersion": "2.20250626.01.00"
-                }
-            },
-            "videoId": video_id
-        }))?
-        .send()?
-        .json::<PlayerDataResponse>()?;
-
-    println!("{}", serde_json::to_string_pretty(&player_data_response).unwrap());
-
-    let tracks = player_data_response
-        .captions
-        .as_ref()
-        .and_then(|c| c.player_captions_tracklist_renderer.as_ref())
-        .map(|r| &r.caption_tracks)
-        .ok_or_else(|| format!("No captions found for language: {language}"))?;
-
-    let track = select_best_track(tracks, language)?;
-    
-    let res = minreq::get(&track.base_url).send()?; 
-    let xml = res.as_bytes();
-    let parsed_xml: Transcript = quick_xml::de::from_reader(xml)?;
-
-    let transcript = parsed_xml.text
-        .into_iter()
-        .map(|entry| {
-            let decoded_caption = decode_html_entities(&entry.content).into_owned();
-            TranscriptEntry {
-                caption: decoded_caption,
-                start_time: entry.start,
-                end_time: entry.start + entry.dur,
-            }
-        })
-        .collect();
-
-    Ok(transcript)
-}
-
-fn select_best_track<'a>(
-    tracks: &'a [CaptionTrack],
-    language: &str,
-) -> Result<&'a CaptionTrack, Box<dyn Error>> {
-    let mut matching_tracks: Vec<&CaptionTrack> = tracks
-        .iter()
-        .filter(|t| t.language_code == language)
-        .collect();
-    
-    matching_tracks.sort_by(|a, b| {
-        let a_punctuated = a.base_url.contains("variant=punctuated");
-        let b_punctuated = b.base_url.contains("variant=punctuated");
-        b_punctuated.cmp(&a_punctuated)
-    });
-
-    matching_tracks
-        .first()
-        .copied()
-        .ok_or_else(|| format!("No captions found for language: {language}").into())
-}
-
-fn get_video_name(html: &str) -> Option<String> {
-    html.split_once(r#"<meta name="title" content=""#)?
-        .1
-        .split_once(r#"">"#)?
-        .0
-        .to_string()
-        .into()
-}
-
-pub struct MergeConfig {
-    pub paragraph_pause_threshold_secs: f32,
-    pub remove_annotations: bool,
-}
-
-fn remove_annotations(text: &str) -> String {
-    let mut cleaned = String::new();
-    let mut depth = 0;
-    for c in text.chars() {
-        if c == '[' || c == '(' {
-            depth += 1;
-        } else if (c == ']' || c == ')') && depth > 0 {
-            depth -= 1;
-        } else if depth == 0 {
-            cleaned.push(c);
-        }
-    }
-    cleaned
+    Ok((transcript, decoded_video_name))
 }
 
 pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> String {
@@ -174,23 +98,16 @@ pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> St
 
     let mut result = String::with_capacity(entries.len() * 40);
     let mut current_line = String::with_capacity(256);
+    let mut last_speech_end_time = entries[0].start_time;
 
-    let mut last_speech_end_time = entries[0].end_time;
-
-    for (i, entry) in entries.iter().enumerate() {
-        let cleaned_caption = if config.remove_annotations {
-            remove_annotations(&entry.caption)
-        } else {
-            entry.caption.clone()
-        };
-        let cleaned_caption = cleaned_caption.trim();
-
+    for entry in entries {
+        let cleaned_caption = entry.caption.trim();
         if cleaned_caption.is_empty() {
             continue;
         }
 
-        if i > 0 {
-            let pause_duration = entry.start_time - last_speech_end_time;
+        let pause_duration = entry.start_time - last_speech_end_time;
+        if !current_line.is_empty() {
             if pause_duration >= config.paragraph_pause_threshold_secs {
                 result.push_str(&current_line);
                 result.push_str("\n\n");
@@ -208,21 +125,135 @@ pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> St
     result
 }
 
-fn extract_video_id(url: &str) -> Result<String, Box<dyn Error>> {
-    if let Some(id) = url.split("v=").nth(1) {
-        return Ok(id.chars().take(11).collect());
+
+fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<Vec<TranscriptEntry>, Box<dyn Error>> {
+    let api_key = html
+        .split_once(r#""INNERTUBE_API_KEY":""#)
+        .and_then(|(_, rest)| rest.split_once('"'))
+        .map(|(key, _)| key)
+        .ok_or("Failed to parse INNERTUBE_API_KEY from HTML")?;
+
+    let player_url = format!("{}/youtubei/v1/player?key={}", YOUTUBE_BASE_URL, api_key);
+
+    let player_data_response = minreq::post(player_url)
+        .with_header("User-Agent", USER_AGENT)
+        .with_header("Referer", YOUTUBE_REFERER)
+        .with_json(&serde_json::json!({
+            "context": {
+                "client": {
+                    "clientName": "WEB",
+                    "clientVersion": "2.20240401.01.00"
+                }
+            },
+            "videoId": video_id
+        }))?
+        .send()?
+        .json::<PlayerDataResponse>()?;
+
+    let tracks = player_data_response
+        .captions
+        .and_then(|c| c.player_captions_tracklist_renderer)
+        .map(|r| r.caption_tracks)
+        .ok_or_else(|| format!("No captions found for language: {}", language))?;
+
+    let track = select_best_track(&tracks, language)?;
+    let captions_url = format_captions_url(&track.base_url);
+
+    let caption_res = minreq::get(captions_url).send()?;
+    let caption_json_str = caption_res.as_str()?;
+
+    let json_response: JsonCaptionResponse = serde_json::from_str(caption_json_str)
+        .map_err(|e| format!("Failed to parse captions JSON: {}\nResponse: {}", e, caption_json_str))?;
+
+    Ok(process_json_captions(json_response.events))
+}
+
+fn extract_video_id(url: &str) -> Option<String> {
+    let extract_id = |s: &str| s.chars().take(11).collect::<String>();
+
+    url.split_once("v=")
+        .or_else(|| url.split_once("/embed/"))
+        .or_else(|| url.split_once("/v/"))
+        .or_else(|| url.split_once("/shorts/"))
+        .or_else(|| url.split_once("youtu.be/"))
+        .map(|(_, after)| extract_id(after))
+}
+
+fn get_video_name(html: &str) -> Option<&str> {
+    Some(html.split_once(r#"<meta name="title" content=""#)?
+        .1
+        .split_once(r#"">"#)?
+        .0)
+}
+
+fn format_captions_url(base_url: &str) -> String {
+    // The base URL from the API may contain unicode-escaped ampersands.
+    format!("{}&fmt=json3", base_url.replace("\\u0026", "&"))
+}
+
+fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&'a CaptionTrack, Box<dyn Error>> {
+    let mut manual_track = None;
+    let mut punctuated_asr_track = None;
+    let mut plain_asr_track = None;
+
+    for track in tracks {
+        if track.language_code == language {
+            let url = &track.base_url;
+            
+            if !url.contains("kind=asr") {
+                manual_track = Some(track);
+                break;
+            }
+            
+            if url.contains("variant=punctuated") {
+                if punctuated_asr_track.is_none() {
+                    punctuated_asr_track = Some(track);
+                }
+            }
+                
+            else {
+                if plain_asr_track.is_none() {
+                    plain_asr_track = Some(track);
+                }
+            }
+        }
     }
-    if let Some(id) = url.split("/embed/").nth(1) {
-        return Ok(id.chars().take(11).collect());
-    }
-    if let Some(id) = url.split("/v/").nth(1) {
-        return Ok(id.chars().take(11).collect());
-    }
-    if let Some(id) = url.split("/shorts/").nth(1) {
-        return Ok(id.chars().take(11).collect());
-    }
-    if let Some(id) = url.split("youtu.be/").nth(1) {
-        return Ok(id.chars().take(11).collect());
-    }
-    Err(format!("Invalid YouTube URL: {url}").into())
+    
+    manual_track
+        .or(punctuated_asr_track)
+        .or(plain_asr_track)
+        .ok_or_else(|| format!("No suitable captions found for language '{}'", language).into())
+}
+
+fn process_json_captions(events: Vec<JsonCaptionEvent>) -> Vec<TranscriptEntry> {
+    events
+        .into_iter()
+        .filter_map(|event| {
+            let (start_ms, duration_ms, segs) = match event {
+                JsonCaptionEvent::CaptionEvent { start_ms, duration_ms, segs: Some(segs) } => {
+                    (start_ms, duration_ms, segs)
+                }
+                _ => return None,
+            };
+
+            let caption_text: String = segs
+                .iter()
+                .map(|s| s.utf8.trim())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<&str>>()
+                .join(" ");
+
+            if caption_text.is_empty() {
+                return None;
+            }
+
+            let decoded_caption = decode_html_entities(&caption_text).into_owned();
+
+            Some(TranscriptEntry {
+                caption: decoded_caption,
+                start_time: start_ms as f32 / 1000.0,
+                end_time: (start_ms + duration_ms) as f32 / 1000.0,
+            })
+        })
+        .collect()
 }
