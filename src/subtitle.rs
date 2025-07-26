@@ -1,6 +1,5 @@
 use serde::{Deserialize};
 use std::error::Error;
-use html_escape::decode_html_entities;
 
 
 #[derive(Debug, Deserialize)]
@@ -82,10 +81,8 @@ pub fn get_video_data(video_url: &str, language: &str) -> Result<(Vec<Transcript
         .ok_or_else(|| format!("Invalid or unsupported YouTube URL: {}", video_url))?;
     
     let (transcript, video_name) = get_transcript_and_title(&video_id, language)?;
-    
-    let decoded_video_name = decode_html_entities(&video_name).into_owned();
 
-    Ok((transcript, decoded_video_name))
+    Ok((transcript, video_name))
 }
 
 pub fn merge_transcript(entries: &[TranscriptEntry], config: &MergeConfig) -> String {
@@ -240,10 +237,8 @@ fn process_json_captions(events: Vec<JsonCaptionEvent>) -> Vec<TranscriptEntry> 
                 return None;
             }
 
-            let decoded_caption = decode_html_entities(&caption_text).into_owned();
-
             Some(TranscriptEntry {
-                caption: decoded_caption,
+                caption: caption_text,
                 start_time: start_ms as f32 / 1000.0,
                 end_time: (start_ms + duration_ms) as f32 / 1000.0,
             })
