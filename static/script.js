@@ -1,330 +1,296 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const apiKeyInput = document.getElementById('api-key');
-    const modelInput = document.getElementById('model');
-    const systemPromptInput = document.getElementById('system-prompt');
-    const dryRunCheckbox = document.getElementById('dry-run');
-    const transcriptOnlyCheckbox = document.getElementById('transcript-only');
+    const config = {
+        baseURL: `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`,
+        storageKeys: {
+            apiKey: 'youtube-tldr-api-key',
+            model: 'youtube-tldr-model',
+            systemPrompt: 'youtube-tldr-system-prompt',
+            dryRun: 'youtube-tldr-dry-run',
+            transcriptOnly: 'youtube-tldr-transcript-only',
+            summaries: 'youtube-tldr-summaries'
+        },
+        defaults: {
+            model: 'gemini-2.5-flash',
+            systemPrompt: "You are an expert video summarizer specializing in creating structured, accurate overviews. Given a YouTube video transcript, extract and present the most crucial information in an article-style format. Prioritize fidelity to the original content, ensuring all significant points, arguments, and key details are faithfully represented. Organize the summary logically with clear, descriptive headings and/or concise bullet points. For maximum skim-readability, bold key terms, core concepts, and critical takeaways within the text. Eliminate advertisements, sponsorships, conversational filler, repeated phrases, and irrelevant tangents, but retain all essential content."
+        }
+    };
 
-    const sidebar = document.getElementById('sidebar');
-    const newSummaryBtn = document.getElementById('new-summary-btn');
-    const savedSummariesList = document.getElementById('saved-summaries-list');
-    const clearSummariesBtn = document.getElementById('clear-summaries-btn');
+    const dom = {
+        // Settings
+        apiKey: document.getElementById('api-key'),
+        model: document.getElementById('model'),
+        systemPrompt: document.getElementById('system-prompt'),
+        dryRun: document.getElementById('dry-run'),
+        transcriptOnly: document.getElementById('transcript-only'),
+        // Sidebar
+        sidebar: document.getElementById('sidebar'),
+        newSummaryBtn: document.getElementById('new-summary-btn'),
+        savedSummariesList: document.getElementById('saved-summaries-list'),
+        clearSummariesBtn: document.getElementById('clear-summaries-btn'),
+        menuToggleBtn: document.getElementById('menu-toggle-btn'),
+        closeSidebarBtn: document.getElementById('close-sidebar-btn'),
+        sidebarOverlay: document.getElementById('sidebar-overlay'),
+        // Main View
+        mainContent: document.getElementById('main-content'),
+        welcomeView: document.getElementById('welcome-view'),
+        summaryView: document.getElementById('summary-view'),
+        form: document.getElementById('summary-form'),
+        urlInput: document.getElementById('youtube-url'),
+        // Status & Output
+        statusContainer: document.getElementById('status-container'),
+        loader: document.getElementById('loader'),
+        errorMessage: document.getElementById('error-message'),
+        summaryContainer: document.getElementById('summary-container'),
+        summaryTitleText: document.getElementById('summary-title-text'),
+        summaryOutput: document.getElementById('summary-output'),
+        transcriptSection: document.getElementById('transcript-section'),
+        transcriptText: document.getElementById('transcript-text'),
+        copySummaryBtn: document.getElementById('copy-summary-btn'),
+        copyTranscriptBtn: document.getElementById('copy-transcript-btn'),
+    };
 
-    const mainContent = document.getElementById('main-content');
-    const welcomeView = document.getElementById('welcome-view');
-    const summaryView = document.getElementById('summary-view');
+    const state = {
+        summaries: [],
+        activeSummaryIndex: -1,
+        isLoading: false,
+        error: null,
+    };
 
-    const form = document.getElementById('summary-form');
-    const urlInput = document.getElementById('youtube-url');
+    const app = {
+        init() {
+            this.loadSettings();
+            this.loadSummaries();
+            this.addEventListeners();
+            this.render();
+        },
 
-    const statusContainer = document.getElementById('status-container');
-    const loader = document.getElementById('loader');
-    const errorMessage = document.getElementById('error-message');
+        addEventListeners() {
+            dom.form.addEventListener('submit', this.handleFormSubmit.bind(this));
+            dom.clearSummariesBtn.addEventListener('click', this.handleClearSummaries.bind(this));
+            dom.newSummaryBtn.addEventListener('click', this.handleNewSummary.bind(this));
+            dom.savedSummariesList.addEventListener('click', this.handleSidebarClick.bind(this));
 
-    const summaryContainer = document.getElementById('summary-container');
-    const summaryTitle = document.getElementById('summary-title');
-    const summaryTitleText = document.getElementById('summary-title-text');
-    const summaryOutput = document.getElementById('summary-output');
+            dom.copySummaryBtn.addEventListener('click', (e) => this.handleCopyClick(e, dom.summaryOutput.mdContent, dom.copySummaryBtn));
+            dom.copyTranscriptBtn.addEventListener('click', (e) => this.handleCopyClick(e, dom.transcriptText.textContent, dom.copyTranscriptBtn));
 
-    const transcriptSection = document.getElementById('transcript-section');
-    const transcriptText = document.getElementById('transcript-text');
+            [dom.menuToggleBtn, dom.closeSidebarBtn, dom.sidebarOverlay].forEach(el => {
+                if (el) el.addEventListener('click', () => this.toggleSidebar());
+            });
 
-    const copySummaryBtn = document.getElementById('copy-summary-btn');
-    const copyTranscriptBtn = document.getElementById('copy-transcript-btn');
+            [dom.apiKey, dom.model, dom.systemPrompt].forEach(el => el.addEventListener('change', this.saveSettings));
+            [dom.dryRun, dom.transcriptOnly].forEach(el => el.addEventListener('change', this.saveSettings));
+        },
 
-    const menuToggleBtn = document.getElementById('menu-toggle-btn');
-    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
-    const sidebarOverlay = document.getElementById('sidebar-overlay');
+        loadSummaries() {
+            state.summaries = JSON.parse(localStorage.getItem(config.storageKeys.summaries)) || [];
+            if (state.summaries.length > 0) {
+                state.activeSummaryIndex = 0;
+            }
+        },
 
-    const baseURL = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
+        saveSummaries() {
+            localStorage.setItem(config.storageKeys.summaries, JSON.stringify(state.summaries));
+            this.render();
+        },
 
-    const API_KEY_STORAGE_KEY = 'youtube-tldr-api-key';
-    const MODEL_STORAGE_KEY = 'youtube-tldr-model';
-    const SYSTEM_PROMPT_STORAGE_KEY = 'youtube-tldr-system-prompt';
-    const DRY_RUN_STORAGE_KEY = 'youtube-tldr-dry-run';
-    const TRANSCRIPT_ONLY_STORAGE_KEY = 'youtube-tldr-transcript-only';
-    const SUMMARIES_STORAGE_KEY = 'youtube-tldr-summaries';
+        loadSettings() {
+            dom.apiKey.value = localStorage.getItem(config.storageKeys.apiKey) || '';
+            dom.model.value = localStorage.getItem(config.storageKeys.model) || config.defaults.model;
+            dom.systemPrompt.value = localStorage.getItem(config.storageKeys.systemPrompt) || config.defaults.systemPrompt;
+            dom.dryRun.checked = localStorage.getItem(config.storageKeys.dryRun) === 'true';
+            dom.transcriptOnly.checked = localStorage.getItem(config.storageKeys.transcriptOnly) === 'true';
+        },
 
-    const DEFAULT_SYSTEM_PROMPT = "You are an expert video summarizer specializing in creating structured, accurate overviews. Given a YouTube video transcript, extract and present the most crucial information in an article-style format. Prioritize fidelity to the original content, ensuring all significant points, arguments, and key details are faithfully represented. Organize the summary logically with clear, descriptive headings and/or concise bullet points. For maximum skim-readability, bold key terms, core concepts, and critical takeaways within the text. Eliminate advertisements, sponsorships, conversational filler, repeated phrases, and irrelevant tangents, but retain all essential content.";
+        saveSettings() {
+            localStorage.setItem(config.storageKeys.apiKey, dom.apiKey.value);
+            localStorage.setItem(config.storageKeys.model, dom.model.value);
+            localStorage.setItem(config.storageKeys.systemPrompt, dom.systemPrompt.value);
+            localStorage.setItem(config.storageKeys.dryRun, dom.dryRun.checked);
+            localStorage.setItem(config.storageKeys.transcriptOnly, dom.transcriptOnly.checked);
+        },
 
-    let activeSummaryIndex = -1;
+        async handleFormSubmit(event) {
+            event.preventDefault();
+            const url = dom.urlInput.value.trim();
+            if (!url) {
+                state.error = "Please enter a YouTube URL.";
+                this.render();
+                return;
+            }
 
-    function getSummaries() {
-        return JSON.parse(localStorage.getItem(SUMMARIES_STORAGE_KEY)) || [];
-    }
+            this.saveSettings();
+            state.isLoading = true;
+            state.error = null;
+            state.activeSummaryIndex = -1;
+            this.render();
 
-    function saveSummaries(summaries) {
-        localStorage.setItem(SUMMARIES_STORAGE_KEY, JSON.stringify(summaries));
-        renderSavedSummaries();
-    }
+            try {
+                const response = await fetch(`${config.baseURL}/api/summarize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url,
+                        api_key: dom.apiKey.value,
+                        model: dom.model.value,
+                        system_prompt: dom.systemPrompt.value,
+                        dry_run: dom.dryRun.checked,
+                        transcript_only: dom.transcriptOnly.checked,
+                    }),
+                });
 
-    function switchView(showSummary) {
-        welcomeView.classList.toggle('hidden', showSummary);
-        summaryView.classList.toggle('hidden', !showSummary);
-    }
-
-    function renderSavedSummaries() {
-        const summaries = getSummaries();
-        savedSummariesList.innerHTML = '';
-
-        if (summaries.length > 0) {
-            summaries.forEach((summary, index) => {
-                const li = document.createElement('li');
-                if (index === activeSummaryIndex) {
-                    li.classList.add('active');
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || `Server error: ${response.status}`);
                 }
 
-                const a = document.createElement('a');
-                a.href = '#';
-                a.dataset.index = index;
-                a.title = summary.name;
+                const newSummary = {
+                    name: data.video_name,
+                    summary: data.summary,
+                    transcript: data.subtitles
+                };
 
-                const icon = document.createElement('i');
-                icon.className = 'fas fa-file-alt';
+                state.summaries.unshift(newSummary);
+                state.activeSummaryIndex = 0;
 
-                const text = document.createElement('span');
-                text.textContent = summary.name;
+            } catch (error) {
+                console.error('Summarization failed:', error);
+                state.error = error.message;
+            } finally {
+                state.isLoading = false;
+                this.saveSummaries();
+            }
+        },
 
-                a.append(icon, text);
+        handleNewSummary() {
+            state.activeSummaryIndex = -1;
+            dom.urlInput.value = '';
+            this.render();
+            if (this.isMobile()) this.toggleSidebar(false);
+        },
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-summary-btn';
-                deleteBtn.dataset.index = index;
-                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-                deleteBtn.title = 'Delete summary';
+        handleClearSummaries() {
+            if (confirm('Are you sure you want to clear all saved summaries?')) {
+                state.summaries = [];
+                state.activeSummaryIndex = -1;
+                this.saveSummaries();
+            }
+        },
 
-                li.append(a, deleteBtn);
-                savedSummariesList.appendChild(li);
-            });
-        }
-    }
+        handleSidebarClick(e) {
+            const link = e.target.closest('a[data-index]');
+            const deleteBtn = e.target.closest('button[data-index]');
 
-    function viewSummary(index) {
-        const summaries = getSummaries();
-        const summary = summaries[index];
-        if (summary) {
-            activeSummaryIndex = parseInt(index, 10);
-            renderSavedSummaries();
-            switchView(true);
-            setStatus(false);
-            summaryTitleText.textContent = summary.name;
-            summaryOutput.mdContent = summary.summary;
-            summaryContainer.classList.remove('hidden');
-
-            if (summary.transcript && summary.transcript.trim()) {
-                transcriptText.textContent = summary.transcript;
-                transcriptSection.classList.remove('hidden');
-            } else {
-                transcriptSection.classList.add('hidden');
+            if (deleteBtn) {
+                e.preventDefault();
+                const index = parseInt(deleteBtn.dataset.index, 10);
+                this.deleteSummary(index);
+                return;
             }
 
-            if (isMobile()) {
-                toggleSidebar(false);
+            if (link) {
+                e.preventDefault();
+                state.activeSummaryIndex = parseInt(link.dataset.index, 10);
+                this.render();
+                if (this.isMobile()) this.toggleSidebar(false);
             }
-        }
-    }
+        },
 
-    function deleteSummary(indexToDelete) {
-        const summaries = getSummaries();
-        const summaryToDelete = summaries[indexToDelete];
-        if (!summaryToDelete) return;
+        deleteSummary(indexToDelete) {
+            const summaryToDelete = state.summaries[indexToDelete];
+            if (!summaryToDelete) return;
 
-        if (confirm(`Are you sure you want to delete the summary for "${summaryToDelete.name}"?`)) {
-            summaries.splice(indexToDelete, 1);
+            if (confirm(`Are you sure you want to delete the summary for "${summaryToDelete.name}"?`)) {
+                state.summaries.splice(indexToDelete, 1);
 
-            if (activeSummaryIndex === indexToDelete) {
-                activeSummaryIndex = -1;
-                switchView(false);
-            } else if (activeSummaryIndex > indexToDelete) {
-                activeSummaryIndex--;
+                if (state.activeSummaryIndex === indexToDelete) {
+                    state.activeSummaryIndex = -1;
+                } else if (state.activeSummaryIndex > indexToDelete) {
+                    state.activeSummaryIndex--;
+                }
+
+                this.saveSummaries();
             }
-            
-            saveSummaries(summaries);
-        }
-    }
+        },
 
-    function clearSummaries() {
-        if (confirm('Are you sure you want to clear all saved summaries?')) {
-            saveSummaries([]);
-            activeSummaryIndex = -1;
-            switchView(false);
-        }
-    }
+        render() {
+            const hasActiveSummary = state.activeSummaryIndex > -1;
+            const currentSummary = hasActiveSummary ? state.summaries[state.activeSummaryIndex] : null;
 
-    function saveSettings() {
-        localStorage.setItem(API_KEY_STORAGE_KEY, apiKeyInput.value);
-        localStorage.setItem(MODEL_STORAGE_KEY, modelInput.value);
-        localStorage.setItem(SYSTEM_PROMPT_STORAGE_KEY, systemPromptInput.value);
-        localStorage.setItem(DRY_RUN_STORAGE_KEY, dryRunCheckbox.checked);
-        localStorage.setItem(TRANSCRIPT_ONLY_STORAGE_KEY, transcriptOnlyCheckbox.checked);
-    }
+            dom.welcomeView.classList.toggle('hidden', state.isLoading || hasActiveSummary);
+            dom.summaryView.classList.toggle('hidden', !(state.isLoading || hasActiveSummary));
 
-    function loadSettings() {
-        apiKeyInput.value = localStorage.getItem(API_KEY_STORAGE_KEY) || '';
-        modelInput.value = localStorage.getItem(MODEL_STORAGE_KEY) || 'gemini-2.5-flash';
-        systemPromptInput.value = localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY) || DEFAULT_SYSTEM_PROMPT;
-        dryRunCheckbox.checked = localStorage.getItem(DRY_RUN_STORAGE_KEY) === 'true';
-        transcriptOnlyCheckbox.checked = localStorage.getItem(TRANSCRIPT_ONLY_STORAGE_KEY) === 'true';
-    }
+            const hasStatus = state.isLoading || state.error;
+            dom.statusContainer.classList.toggle('hidden', !hasStatus);
+            dom.loader.style.display = state.isLoading ? 'flex' : 'none';
+            dom.errorMessage.style.display = state.error ? 'block' : 'none';
+            dom.errorMessage.textContent = state.error || '';
 
-    function setStatus(isLoading = false, error = null) {
-        const hasStatus = isLoading || error;
-        statusContainer.classList.toggle('hidden', !hasStatus);
-        loader.style.display = isLoading ? 'flex' : 'none';
-        errorMessage.style.display = error ? 'block' : 'none';
-        errorMessage.textContent = error || '';
+            dom.summaryContainer.classList.toggle('hidden', !currentSummary || hasStatus);
+            dom.transcriptSection.classList.toggle('hidden', true);
 
-        if (hasStatus) {
-            summaryContainer.classList.add('hidden');
-            transcriptSection.classList.add('hidden');
-        }
-    }
-
-    function isMobile() {
-        return window.innerWidth <= 800;
-    }
-
-    function toggleSidebar(force) {
-        document.body.classList.toggle('sidebar-open', force);
-        if (menuToggleBtn) {
-            menuToggleBtn.setAttribute('aria-expanded', String(document.body.classList.contains('sidebar-open')));
-        }
-    }
-
-    if (menuToggleBtn) {
-        menuToggleBtn.addEventListener('click', () => toggleSidebar());
-    }
-    if (closeSidebarBtn) {
-        closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
-    }
-    if (sidebarOverlay) {
-        sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
-    }
-
-    async function summarize(event) {
-        event.preventDefault();
-        const url = urlInput.value;
-        if (!url) {
-            setStatus(false, "Please enter a YouTube URL.");
-            return;
-        }
-
-        saveSettings();
-        switchView(true);
-        setStatus(true);
-
-        try {
-            const response = await fetch(`${baseURL}/api/summarize`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    url,
-                    api_key: apiKeyInput.value,
-                    model: modelInput.value,
-                    system_prompt: systemPromptInput.value,
-                    dry_run: dryRunCheckbox.checked,
-                    transcript_only: transcriptOnlyCheckbox.checked
-                }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || `Server error: ${response.status}`);
+            if (currentSummary) {
+                dom.summaryTitleText.textContent = currentSummary.name;
+                dom.summaryOutput.mdContent = currentSummary.summary;
+                if (currentSummary.transcript && currentSummary.transcript.trim()) {
+                    dom.transcriptText.textContent = currentSummary.transcript;
+                    dom.transcriptSection.classList.remove('hidden');
+                }
             }
 
-            setStatus(false);
-            summaryTitleText.textContent = data.video_name;
-            summaryOutput.mdContent = data.summary;
-            summaryContainer.classList.remove('hidden');
+            this.renderSidebarList();
+        },
 
-            if (data.subtitles && data.subtitles.trim()) {
-                transcriptText.textContent = data.subtitles;
-                transcriptSection.classList.remove('hidden');
-            }
+        renderSidebarList() {
+            dom.savedSummariesList.innerHTML = state.summaries.map((summary, index) => `
+                <li class="${index === state.activeSummaryIndex ? 'active' : ''}">
+                    <a href="#" data-index="${index}" title="${this.escapeHtml(summary.name)}">
+                        <i class="fas fa-file-alt"></i>
+                        <span>${this.escapeHtml(summary.name)}</span>
+                    </a>
+                    <button class="delete-summary-btn" data-index="${index}" title="Delete summary">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </li>
+            `).join('');
+        },
 
-            const summaries = getSummaries();
-            summaries.unshift({ name: data.video_name, summary: data.summary, transcript: data.subtitles });
-            saveSummaries(summaries);
-            activeSummaryIndex = 0;
-            renderSavedSummaries();
-
-        } catch (error) {
-            setStatus(false, error.message);
-        }
-    }
-
-
-    loadSettings();
-    renderSavedSummaries();
-    form.addEventListener('submit', summarize);
-    clearSummariesBtn.addEventListener('click', clearSummaries);
-
-    newSummaryBtn.addEventListener('click', () => {
-        activeSummaryIndex = -1;
-        urlInput.value = '';
-        renderSavedSummaries();
-        switchView(false);
-        if (isMobile()) {
-            toggleSidebar(false);
-        }
-    });
-
-    savedSummariesList.addEventListener('click', (e) => {
-        const link = e.target.closest('a');
-        const deleteBtn = e.target.closest('.delete-summary-btn');
-
-        if (deleteBtn) {
+        async handleCopyClick(e, text, button) {
             e.preventDefault();
-            const index = parseInt(deleteBtn.dataset.index, 10);
-            if (!isNaN(index)) {
-                deleteSummary(index);
-            }
-            return;
-        }
+            e.stopPropagation();
+            if (!text) return;
 
-        if (link && link.dataset.index) {
-            e.preventDefault();
-            const index = parseInt(link.dataset.index, 10);
-            if (!isNaN(index)) {
-                viewSummary(index);
-            }
-        }
-    });
-
-    async function copyToClipboard(text, button) {
-        if (!text) return;
-        try {
-            await navigator.clipboard.writeText(text);
             const originalIcon = button.innerHTML;
             const originalTitle = button.title;
-            button.innerHTML = '<i class="fas fa-check"></i>';
-            button.title = 'Copied!';
-            setTimeout(() => {
-                button.innerHTML = originalIcon;
-                button.title = originalTitle;
-            }, 2000);
-        } catch (err) {
-            console.error('Failed to copy: ', err);
-            const originalTitle = button.title;
-            button.title = 'Failed to copy';
-            setTimeout(() => {
-                button.title = originalTitle;
-            }, 2000);
+            try {
+                await navigator.clipboard.writeText(text);
+                button.innerHTML = '<i class="fas fa-check"></i>';
+                button.title = 'Copied!';
+            } catch (err) {
+                console.error('Failed to copy: ', err);
+                button.title = 'Failed to copy';
+            } finally {
+                setTimeout(() => {
+                    button.innerHTML = originalIcon;
+                    button.title = originalTitle;
+                }, 2000);
+            }
+        },
+
+        isMobile: () => window.innerWidth <= 800,
+
+        toggleSidebar(force) {
+            document.body.classList.toggle('sidebar-open', force);
+            dom.menuToggleBtn.setAttribute('aria-expanded', document.body.classList.contains('sidebar-open'));
+        },
+
+        escapeHtml(str) {
+            const p = document.createElement('p');
+            p.textContent = str;
+            return p.innerHTML;
         }
-    }
+    };
 
-    copySummaryBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        copyToClipboard(summaryOutput.mdContent, copySummaryBtn);
-    });
-
-    copyTranscriptBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        copyToClipboard(transcriptText.textContent, copyTranscriptBtn);
-    });
+    app.init();
 });
 
 window.addEventListener('unhandledrejection', event => {
