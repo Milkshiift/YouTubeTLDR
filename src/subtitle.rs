@@ -52,7 +52,10 @@ struct TextEntry {
 
 pub fn get_video_data(video_url: &str, language: &str) -> Result<(Vec<TranscriptEntry>, String), Box<dyn Error>> {
     let video_id = extract_video_id(video_url)?;
-    let res = minreq::get(format!("https://youtu.be/{}", video_id)).send()?;
+    let res = minreq::get(format!("https://youtu.be/{}", video_id))
+        .with_header("Referer", "https://www.youtube.com/")
+        .with_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.3")
+        .send()?;
     let html = res.as_str()?;
     
     let transcript = get_youtube_transcript(html, &video_id, language)?;
@@ -65,16 +68,18 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
     let api_key = html.split(r#""INNERTUBE_API_KEY":""#)
         .nth(1)
         .and_then(|s| s.split('"').next())
-        .ok_or("INNERTUBE_API_KEY not found")?;
+        .ok_or("INNERTUBE_API_KEY not found. YouTube likely blocked the server ip.")?;
     
     let player_url = format!("https://www.youtube.com/youtubei/v1/player?key={}", api_key);
 
     let player_data_response = minreq::post(&player_url)
+        .with_header("Referer", "https://www.youtube.com/")
+        .with_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.3")
         .with_json(&serde_json::json!({
             "context": {
                 "client": {
                     "clientName": "WEB",
-                    "clientVersion": "2.20210721.00.00"
+                    "clientVersion": "2.20250626.01.00"
                 }
             },
             "videoId": video_id
