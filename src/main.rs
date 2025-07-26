@@ -18,6 +18,7 @@ struct SummarizeRequest {
     model: Option<String>,
     system_prompt: Option<String>,
     dry_run: bool,
+    transcript_only: bool
 }
 
 #[derive(Serialize)]
@@ -168,6 +169,14 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
             remove_annotations: false,
         },
     );
+    
+    if req.transcript_only {
+        return Ok(SummarizeResponse {
+            summary: merged_transcript.clone(),
+            subtitles: merged_transcript,
+            video_name,
+        });
+    }
 
     let api_key = req.api_key.filter(|k| !k.is_empty()).ok_or("API key not provided")?;
     let model = req.model.filter(|m| !m.is_empty()).ok_or("Model unspecified")?;

@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelInput = document.getElementById('model');
     const systemPromptInput = document.getElementById('system-prompt');
     const dryRunCheckbox = document.getElementById('dry-run');
+    const transcriptOnlyCheckbox = document.getElementById('transcript-only');
 
     const sidebar = document.getElementById('sidebar');
     const newSummaryBtn = document.getElementById('new-summary-btn');
@@ -37,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MODEL_STORAGE_KEY = 'youtube-tldr-model';
     const SYSTEM_PROMPT_STORAGE_KEY = 'youtube-tldr-system-prompt';
     const DRY_RUN_STORAGE_KEY = 'youtube-tldr-dry-run';
+    const TRANSCRIPT_ONLY_STORAGE_KEY = 'youtube-tldr-transcript-only';
     const SUMMARIES_STORAGE_KEY = 'youtube-tldr-summaries';
 
     const DEFAULT_SYSTEM_PROMPT = "You are an expert video summarizer specializing in creating structured, accurate overviews. Given a YouTube video transcript, extract and present the most crucial information in an article-style format. Prioritize fidelity to the original content, ensuring all significant points, arguments, and key details are faithfully represented. Organize the summary logically with clear, descriptive headings and/or concise bullet points. For maximum skim-readability, bold key terms, core concepts, and critical takeaways within the text. Eliminate advertisements, sponsorships, conversational filler, repeated phrases, and irrelevant tangents, but retain all essential content.";
@@ -146,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(MODEL_STORAGE_KEY, modelInput.value);
         localStorage.setItem(SYSTEM_PROMPT_STORAGE_KEY, systemPromptInput.value);
         localStorage.setItem(DRY_RUN_STORAGE_KEY, dryRunCheckbox.checked);
+        localStorage.setItem(TRANSCRIPT_ONLY_STORAGE_KEY, transcriptOnlyCheckbox.checked);
     }
 
     function loadSettings() {
@@ -153,6 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modelInput.value = localStorage.getItem(MODEL_STORAGE_KEY) || 'gemini-2.5-flash';
         systemPromptInput.value = localStorage.getItem(SYSTEM_PROMPT_STORAGE_KEY) || DEFAULT_SYSTEM_PROMPT;
         dryRunCheckbox.checked = localStorage.getItem(DRY_RUN_STORAGE_KEY) === 'true';
+        transcriptOnlyCheckbox.checked = localStorage.getItem(TRANSCRIPT_ONLY_STORAGE_KEY) === 'true';
     }
 
     function setStatus(isLoading = false, error = null) {
@@ -190,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     model: modelInput.value,
                     system_prompt: systemPromptInput.value,
                     dry_run: dryRunCheckbox.checked,
+                    transcript_only: transcriptOnlyCheckbox.checked
                 }),
             });
 
