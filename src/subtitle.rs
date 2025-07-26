@@ -88,13 +88,15 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
         .json::<PlayerDataResponse>()?;
 
     println!("{}", serde_json::to_string_pretty(&player_data_response).unwrap());
-    
-    let track = player_data_response
+
+    let tracks = player_data_response
         .captions
         .as_ref()
         .and_then(|c| c.player_captions_tracklist_renderer.as_ref())
-        .and_then(|r| r.caption_tracks.iter().find(|t| t.language_code == language))
+        .map(|r| &r.caption_tracks)
         .ok_or_else(|| format!("No captions found for language: {language}"))?;
+
+    let track = select_best_track(tracks, language)?;
     
     let res = minreq::get(&track.base_url).send()?; 
     let xml = res.as_bytes();
@@ -113,6 +115,27 @@ fn get_youtube_transcript(html: &str, video_id: &str, language: &str) -> Result<
         .collect();
 
     Ok(transcript)
+}
+
+fn select_best_track<'a>(
+    tracks: &'a [CaptionTrack],
+    language: &str,
+) -> Result<&'a CaptionTrack, Box<dyn Error>> {
+    let mut matching_tracks: Vec<&CaptionTrack> = tracks
+        .iter()
+        .filter(|t| t.language_code == language)
+        .collect();
+    
+    matching_tracks.sort_by(|a, b| {
+        let a_punctuated = a.base_url.contains("variant=punctuated");
+        let b_punctuated = b.base_url.contains("variant=punctuated");
+        b_punctuated.cmp(&a_punctuated)
+    });
+
+    matching_tracks
+        .first()
+        .copied()
+        .ok_or_else(|| format!("No captions found for language: {language}").into())
 }
 
 fn get_video_name(html: &str) -> Option<String> {
