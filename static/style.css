@@ -140,7 +140,7 @@
     #welcome-view header p {
         color: var(--text-secondary);
         font-size: 1.125rem;
-        max-width: 550px;
+        max-width: 560px;
         margin-left: auto;
         margin-right: auto;
         line-height: 1.7;

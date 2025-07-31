@@ -58,6 +58,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const app = {
         init() {
+            if (config.baseURL.includes('onrender.com')) {
+                const desc = document.getElementById('description');
+                desc.innerHTML =
+                    `
+                        Demo for YouTubeTLDR.<br>
+                        Summarization will not work because YouTube blocks server's IP.<br>
+                        Self-host it yourself: <a target="_blank" href="https://github.com/Milkshiift/YouTubeTLDR">GitHub</a>
+                    `
+                ;
+            }
+
             this.loadSettings();
             this.loadSummaries();
             this.addEventListeners();
