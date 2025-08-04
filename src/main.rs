@@ -78,7 +78,7 @@ fn main() {
     for request in server.incoming_requests() {
         let is_static_and_get = matches!(
             (request.method(), request.url()), 
-            (Method::Get, "/") | (Method::Get, "/index.html") | (Method::Get, "/style.css") | (Method::Get, "/script.js")
+            (Method::Get, "/") | (Method::Get, "/index.html") | (Method::Get, "/style.min.css") | (Method::Get, "/script.min.js")
         );
 
         if is_static_and_get {
@@ -100,11 +100,11 @@ fn handle_request(request: Request) {
         (Method::Get, "/") | (Method::Get, "/index.html") => {
             serve_static(request, include_str!("../static/index.html"), "text/html");
         }
-        (Method::Get, "/style.css") => {
-            serve_static(request, include_str!("../static/style.css"), "text/css");
+        (Method::Get, "/style.min.css") => {
+            serve_static(request, include_str!("../static/style.min.css"), "text/css");
         }
-        (Method::Get, "/script.js") => {
-            serve_static(request, include_str!("../static/script.js"), "application/javascript");
+        (Method::Get, "/script.min.js") => {
+            serve_static(request, include_str!("../static/script.min.js"), "application/javascript");
         }
         _ => {
             respond_with_error(request, "404 Not Found", StatusCode(404));

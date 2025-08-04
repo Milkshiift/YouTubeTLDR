@@ -13,6 +13,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tiny_http = "0.12"
 
+[build-dependencies]
+minifier = "0.3.6"
+
 [features]
 default = ["native-tls"]
 native-tls = ["minreq/https-native"]
