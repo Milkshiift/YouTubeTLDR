@@ -1,17 +1,13 @@
-mod gemini;
 mod subtitle;
 
-use crate::gemini::ask::Gemini;
-use crate::gemini::types::request::SystemInstruction;
-use crate::gemini::types::sessions::Session;
 use crate::subtitle::get_video_data;
 use crossbeam_channel::{bounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::Arc;
 use std::thread;
+mod gemini;
 
 #[derive(Deserialize)]
 struct SummarizeRequest {
@@ -193,13 +189,8 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
     let model = req.model.as_deref().filter(|m| !m.is_empty()).ok_or("Missing model")?;
     let system_prompt = req.system_prompt.as_deref().filter(|p| !p.is_empty()).ok_or("Missing prompt")?;
 
-    let gemini = Gemini::new(api_key, model, Some(SystemInstruction::from_str(system_prompt)));
-    let mut session = Session::new(2);
-    session.ask_string(transcript.clone());
-
-    let summary = gemini.ask(&mut session)
-        .map_err(|e| format!("API error: {}", e))?
-        .get_text("");
+    let summary = gemini::summarize(api_key, model, system_prompt, &transcript)
+        .map_err(|e| format!("API error: {}", e))?;
 
     Ok(SummarizeResponse {
         summary,
@@ -240,18 +231,12 @@ fn write_error_response(stream: &mut TcpStream, status: &str, msg: &str) -> io::
 }
 
 fn parse_headers(data: &[u8]) -> Option<(&[u8], usize)> {
-    let mut headers_end = 0;
-    if let Some(pos) = data.windows(4).position(|w| w == b"\r\n\r\n") {
-        headers_end = pos + 4;
-    } else {
-        return None;
-    }
-
-    if headers_end > 0 {
-        Some((&data[..headers_end], headers_end))
-    } else {
-        None
-    }
+    data.windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .map(|pos| {
+            let headers_end = pos + 4;
+            (&data[..headers_end], headers_end)
+        })
 }
 
 fn get_content_length(headers: &[u8]) -> Option<usize> {
