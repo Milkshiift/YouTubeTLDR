@@ -4,7 +4,9 @@
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/milkshiift/YouTubeTLDR/blob/master/LICENSE)
 
 <div align="center">
-<h3>⚡ A lightweight, self-hosted YouTube video summarizer with Gemini AI<br></h3>
+<h3>⚡ A lightweight, self-hosted YouTube video summarizer with Gemini AI<br>
+<sub>Demo: <a href="https://youtubetldr.onrender.com/">https://tldr.milkshift.dedyn.io/</a></sub>
+</h3>
 <img src="/assets/mainScreenshot.png" width="400" alt="New summary page screenshot">
 <img src="/assets/summaryScreenshot.png" width="400" alt="Summary screenshot">
 </div>
