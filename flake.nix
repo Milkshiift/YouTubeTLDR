@@ -78,6 +78,15 @@
                   Restart = "on-failure";
                   User = "youtubetldr";
                   Group = "youtubetldr";
+                  CapabilityBoundingSet = ""; # No capabilities
+                  PrivateTmp = true; # Private /tmp and /var/tmp
+                  NoNewPrivileges = true; # Prevent privilege escalation
+                  ProtectSystem = "strict"; # Protect the /boot, /etc, /usr, and /opt hierarchies
+                  ProtectHome = true; # Protect /home, /root, /run/user
+                  RestrictSUIDSGID = true; # Prevent SUID/SGID bits from being set
+                  RestrictRealtime = true; # Prevent realtime scheduling
+                  RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ]; # Only allow IPv4 and IPv6 sockets
+                  SystemCallFilter = [ "~@cpu-emulation @debug @keyring @mount @module @obsolete @raw-io @reboot @swap" ]; # Restrict syscalls
                   Environment = [
                     "TLDR_IP=${cfg.ip}"
                     "TLDR_PORT=${toString cfg.port}"
