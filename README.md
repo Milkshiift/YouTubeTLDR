@@ -4,10 +4,7 @@
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/milkshiift/YouTubeTLDR/blob/master/LICENSE)
 
 <div align="center">
-<h3>⚡ A lightweight, self-hosted YouTube video summarizer with Gemini AI<br>
-Demo: <a href="https://youtubetldr.onrender.com/">https://youtubetldr.onrender.com/</a> <sup>1</sup> 
-<br> 
-<sup><sup>1</sup>Actual summarization doesn't work because YouTube blocks server IP</sup></h3>
+<h3>⚡ A lightweight, self-hosted YouTube video summarizer with Gemini AI<br></h3>
 <img src="/assets/mainScreenshot.png" width="400" alt="New summary page screenshot">
 <img src="/assets/summaryScreenshot.png" width="400" alt="Summary screenshot">
 </div>
@@ -25,8 +22,7 @@ Demo: <a href="https://youtubetldr.onrender.com/">https://youtubetldr.onrender.c
 
 YouTubeTLDR embraces simplicity — maximum functionality with minimal overhead.
 
-*   🪶 **Featherweight:** Single binary ~**1MB**
-*   🚫 **Zero Bloat:** No databases, no Tokio, no frameworks
+*   🪶 **Featherweight & Zero Bloat:** Single binary ~**0.6MB**. No databases, no Tokio, no frameworks
 *   ⚡ **Lightning Fast:** Pure Rust + vanilla HTML/JS
 *   🔑 **BYOK:** Bring Your Own Key. Uses your Google Gemini API directly — no proxies, no data collection
 *   🎯 **Single Purpose:** Just generates and saves summaries, that's it
@@ -41,14 +37,13 @@ Note: This server is optimized for personal use and utilizes a multithreaded wor
 
 ### Running the Application
 
-1.  Download the latest release for your platform from [Releases](https://github.com/Milkshiift/YouTubeTLDR/releases)
-2.  Run the executable from console:
+1.  Download the [latest release](https://github.com/Milkshiift/YouTubeTLDR/releases/latest) and run the executable from console:
     ```bash
     ./YouTubeTLDR
     ```
-3.  Open `http://localhost:8000` in your browser
-4.  Click "Advanced Settings" and enter your API key
-5.  Paste a YouTube URL and click "Summarize"
+2.  Open `http://localhost:8000` in your browser
+3.  Click "Advanced Settings" and enter your API key
+4.  Paste a YouTube URL and click "Summarize"
 
 You can change the IP and port with `TLDR_IP` and `TLDR_PORT` environment variables.    
 The amount of workers can be changed with `TLDR_WORKERS`, set it to the amount of concurrent users you expect.
