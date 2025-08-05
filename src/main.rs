@@ -59,9 +59,9 @@ fn main() -> io::Result<()> {
     let listener = TcpListener::bind(&addr)?;
     println!("✅ Server started at http://{}", addr);
     println!("✅ Spawning {} worker threads", num_workers);
-    
+
     let (sender, receiver) = bounded(100);
-    
+
     for id in 0..num_workers {
         let receiver = receiver.clone();
         thread::spawn(move || worker(id, receiver));
@@ -86,7 +86,7 @@ fn handle_connection(stream: TcpStream, sender: &Sender<WorkItem>) -> io::Result
     let mut stream_clone = stream.try_clone()?;
 
     let work_item = WorkItem { stream };
-    
+
     match sender.try_send(work_item) {
         Ok(()) => Ok(()),
         Err(crossbeam_channel::TrySendError::Full(_)) => {
@@ -159,8 +159,8 @@ fn handle_get(request: &[u8], mut stream: TcpStream) -> io::Result<()> {
 
     let response = match path {
         b"/" | b"/index.html" => build_static_response("text/html", HTML_RESPONSE),
-        b"/style.min.css" => build_static_response("text/css", CSS_RESPONSE),
-        b"/script.min.js" => build_static_response("application/javascript", JS_RESPONSE),
+        b"/style.css" => build_static_response("text/css", CSS_RESPONSE),
+        b"/script.js" => build_static_response("application/javascript", JS_RESPONSE),
         _ => NOT_FOUND_RESPONSE.to_vec(),
     };
 
