@@ -36,13 +36,13 @@ struct WorkItem {
 
 macro_rules! static_response {
     ($name:ident, $content_type:expr, $path:expr) => {
-        static $name: &[u8] = include_bytes!(concat!("../static/", $path));
+        static $name: &[u8] = include_bytes!(concat!("../static/", $path, ".br"));
     };
 }
 
 static_response!(HTML_RESPONSE, b"text/html; charset=utf8", "index.html");
-static_response!(CSS_RESPONSE, b"text/css; charset=utf8", "style.min.css");
-static_response!(JS_RESPONSE, b"application/javascript; charset=utf8", "script.min.js");
+static_response!(CSS_RESPONSE, b"text/css; charset=utf8", "style.css");
+static_response!(JS_RESPONSE, b"application/javascript; charset=utf8", "script.js");
 
 const NOT_FOUND_RESPONSE: &[u8] = b"HTTP/1.1 404 NOT FOUND\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n404";
 
@@ -209,7 +209,15 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
 }
 
 fn build_static_response(content_type: &str, content: &[u8]) -> Vec<u8> {
-    build_response("200 OK", content_type, content)
+    format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Encoding: br\r\nContent-Length: {}\r\n\r\n",
+        content_type,
+        content.len()
+    )
+        .into_bytes()
+        .into_iter()
+        .chain(content.iter().cloned())
+        .collect()
 }
 
 fn build_response(status: &str, content_type: &str, content: &[u8]) -> Vec<u8> {
