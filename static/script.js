@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         transcriptText: document.getElementById('transcript-text'),
         copySummaryBtn: document.getElementById('copy-summary-btn'),
         copyTranscriptBtn: document.getElementById('copy-transcript-btn'),
+        videoLink: document.getElementById('video-link'),
     };
 
     const state = {
@@ -169,7 +170,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newSummary = {
                     name: data.video_name,
                     summary: data.summary,
-                    transcript: data.subtitles
+                    transcript: data.subtitles,
+                    url: url
                 };
 
                 state.summaries.unshift(newSummary);
@@ -258,6 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (currentSummary) {
                 dom.summaryTitleText.textContent = currentSummary.name;
+                dom.videoLink.href = currentSummary.url;
                 dom.summaryOutput.mdContent = currentSummary.summary;
                 if (currentSummary.transcript && currentSummary.transcript.trim()) {
                     dom.transcriptText.textContent = currentSummary.transcript;

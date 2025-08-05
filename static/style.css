@@ -524,6 +524,10 @@
         color: var(--primary-color);
     }
 
+    #video-link {
+        margin-right: 0.5rem; /* Space between video icon and copy icon */
+    }
+
     md-block {
         font-size: 1.05rem;
         line-height: 1.8;
