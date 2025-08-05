@@ -32,7 +32,7 @@ struct WorkItem {
 
 macro_rules! static_response {
     ($name:ident, $content_type:expr, $path:expr) => {
-        static $name: &[u8] = include_bytes!(concat!("../static/", $path, ".br"));
+        static $name: &[u8] = include_bytes!(concat!("../static/", $path, ".gz"));
     };
 }
 
@@ -201,7 +201,7 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
 
 fn build_static_response(content_type: &str, content: &[u8]) -> Vec<u8> {
     format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Encoding: br\r\nContent-Length: {}\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Encoding: gzip\r\nContent-Length: {}\r\n\r\n",
         content_type,
         content.len()
     )
