@@ -149,10 +149,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     }),
                 });
 
-                const data = await response.json();
+                const responseText = await response.text();
+
                 if (!response.ok) {
-                    throw new Error(data.error || `Server error: ${response.status}`);
+                    let errorMsg = responseText;
+                    try {
+                        const errorData = JSON.parse(responseText);
+                        if (errorData && errorData.error) {
+                            errorMsg = errorData.error;
+                        }
+                    } catch (e) {
+                        // Not JSON, or JSON without .error, use text as is.
+                    }
+                    throw new Error(errorMsg || `Server error: ${response.status}`);
                 }
+
+                const data = JSON.parse(responseText);
 
                 const newSummary = {
                     name: data.video_name,
@@ -174,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         handleNewSummary() {
             state.activeSummaryIndex = -1;
+            state.error = null;
             dom.urlInput.value = '';
             this.render();
             if (this.isMobile()) this.toggleSidebar(false);
@@ -183,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (confirm('Are you sure you want to clear all saved summaries?')) {
                 state.summaries = [];
                 state.activeSummaryIndex = -1;
+                state.error = null;
                 this.saveSummaries();
             }
         },
@@ -201,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (link) {
                 e.preventDefault();
                 state.activeSummaryIndex = parseInt(link.dataset.index, 10);
+                state.error = null;
                 this.render();
                 if (this.isMobile()) this.toggleSidebar(false);
             }
@@ -215,6 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (state.activeSummaryIndex === indexToDelete) {
                     state.activeSummaryIndex = -1;
+                    state.error = null; // Clear error if the active (and possibly error-causing) summary is deleted
                 } else if (state.activeSummaryIndex > indexToDelete) {
                     state.activeSummaryIndex--;
                 }
@@ -226,9 +242,10 @@ document.addEventListener('DOMContentLoaded', () => {
         render() {
             const hasActiveSummary = state.activeSummaryIndex > -1;
             const currentSummary = hasActiveSummary ? state.summaries[state.activeSummaryIndex] : null;
+            const shouldShowSummaryView = state.isLoading || hasActiveSummary || state.error;
 
-            dom.welcomeView.classList.toggle('hidden', state.isLoading || hasActiveSummary);
-            dom.summaryView.classList.toggle('hidden', !(state.isLoading || hasActiveSummary));
+            dom.welcomeView.classList.toggle('hidden', shouldShowSummaryView);
+            dom.summaryView.classList.toggle('hidden', !shouldShowSummaryView);
 
             const hasStatus = state.isLoading || state.error;
             dom.statusContainer.classList.toggle('hidden', !hasStatus);
