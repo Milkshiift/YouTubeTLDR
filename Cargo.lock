@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "YouTubeTLDR"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "crossbeam-channel",
  "flate2",
