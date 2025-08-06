@@ -65,7 +65,7 @@ pub fn summarize(
             "temperature": 1,
             "topK": 1,
             "topP": 0.95,
-            "maxOutputTokens": 4096,
+            "maxOutputTokens": 65536,
             "stopSequences": []
         },
         "safetySettings": [
