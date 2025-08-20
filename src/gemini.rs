@@ -63,7 +63,7 @@ pub fn summarize(
         ],
         "generationConfig": {
             "temperature": 1,
-            "topK": 1,
+            "topK": 64,
             "topP": 0.95,
             "maxOutputTokens": 65536,
             "stopSequences": []
