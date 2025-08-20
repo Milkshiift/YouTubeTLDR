@@ -185,9 +185,9 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
         });
     }
 
-    let api_key = req.api_key.as_deref().filter(|k| !k.is_empty()).ok_or("Missing API key")?;
-    let model = req.model.as_deref().filter(|m| !m.is_empty()).ok_or("Missing model")?;
-    let system_prompt = req.system_prompt.as_deref().filter(|p| !p.is_empty()).ok_or("Missing prompt")?;
+    let api_key = req.api_key.as_deref().filter(|k| !k.is_empty()).ok_or("Missing Gemini API key. Get one here: https://aistudio.google.com/app/apikey")?;
+    let model = req.model.as_deref().filter(|m| !m.is_empty()).ok_or("Missing model name")?;
+    let system_prompt = req.system_prompt.as_deref().filter(|p| !p.is_empty()).ok_or("Missing system prompt")?;
 
     let summary = gemini::summarize(api_key, model, system_prompt, &transcript)
         .map_err(|e| format!("API error: {}", e))?;
