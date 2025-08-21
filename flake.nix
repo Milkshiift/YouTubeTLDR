@@ -65,6 +65,12 @@
                 default = 8000;
                 description = "Port to listen on";
               };
+
+              workers = pkgs.lib.mkOption {
+                type = pkgs.lib.types.int;
+                default = 4;
+                description = "Number of worker threads";
+              };
             };
 
             config = pkgs.lib.mkIf cfg.enable {
@@ -90,6 +96,7 @@
                   Environment = [
                     "TLDR_IP=${cfg.ip}"
                     "TLDR_PORT=${toString cfg.port}"
+                    "TLDR_WORKERS=${toString cfg.workers}"
                   ];
                 };
               };
