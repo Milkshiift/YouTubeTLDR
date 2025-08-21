@@ -1,4 +1,5 @@
 mod subtitle;
+mod gemini;
 
 use crate::subtitle::get_video_data;
 use crossbeam_channel::{bounded, Receiver, Sender};
@@ -7,7 +8,7 @@ use std::env;
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
-mod gemini;
+use std::time::Duration;
 
 #[derive(Deserialize)]
 struct SummarizeRequest {
@@ -31,16 +32,18 @@ struct WorkItem {
 }
 
 macro_rules! static_response {
-    ($name:ident, $content_type:expr, $path:expr) => {
+    ($name:ident, $path:expr) => {
         static $name: &[u8] = include_bytes!(concat!("../static/", $path, ".gz"));
     };
 }
 
-static_response!(HTML_RESPONSE, b"text/html; charset=utf8", "index.html");
-static_response!(CSS_RESPONSE, b"text/css; charset=utf8", "style.css");
-static_response!(JS_RESPONSE, b"application/javascript; charset=utf8", "script.js");
+static_response!(HTML_RESPONSE, "index.html");
+static_response!(CSS_RESPONSE, "style.css");
+static_response!(JS_RESPONSE, "script.js");
 
-const NOT_FOUND_RESPONSE: &[u8] = b"HTTP/1.1 404 NOT FOUND\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n404";
+const READ_WRITE_TIMEOUT: Duration = Duration::from_secs(15);
+const MAX_HEADER_SIZE: usize = 8 * 1024; // 8 KB
+const MAX_BODY_SIZE: usize = 10 * 1024 * 1024; // 10 MB
 
 fn main() -> io::Result<()> {
     let ip = env::var("TLDR_IP").unwrap_or_else(|_| "0.0.0.0".into());
@@ -79,6 +82,10 @@ fn main() -> io::Result<()> {
 }
 
 fn handle_connection(stream: TcpStream, sender: &Sender<WorkItem>) -> io::Result<()> {
+    // Prevent slow clients from holding connections open indefinitely.
+    stream.set_read_timeout(Some(READ_WRITE_TIMEOUT))?;
+    stream.set_write_timeout(Some(READ_WRITE_TIMEOUT))?;
+
     let mut stream_clone = stream.try_clone()?;
 
     let work_item = WorkItem { stream };
@@ -86,10 +93,10 @@ fn handle_connection(stream: TcpStream, sender: &Sender<WorkItem>) -> io::Result
     match sender.try_send(work_item) {
         Ok(()) => Ok(()),
         Err(crossbeam_channel::TrySendError::Full(_)) => {
-            write_error_response(&mut stream_clone, "503", "Server busy")
+            write_error_response(&mut stream_clone, "503 Service Unavailable", "Server is busy, please try again later.")
         }
         Err(crossbeam_channel::TrySendError::Disconnected(_)) => {
-            write_error_response(&mut stream_clone, "500", "Worker pool down")
+            write_error_response(&mut stream_clone, "500 Internal Server Error", "Worker pool has been disconnected.")
         }
     }
 }
@@ -101,7 +108,7 @@ fn worker(id: usize, receiver: Receiver<WorkItem>) {
             Ok(mut work_item) => {
                 if let Err(e) = handle_request(&mut work_item.stream) {
                     eprintln!("❌ Worker {} error: {}", id, e);
-                    let _ = write_error_response(&mut work_item.stream, "500", &format!("Internal Server Error: {}", e));
+                    let _ = write_error_response(&mut work_item.stream, "500 Internal Server Error", &e.to_string());
                 }
             }
             Err(_) => {
@@ -112,56 +119,50 @@ fn worker(id: usize, receiver: Receiver<WorkItem>) {
     }
 }
 
-fn handle_request(stream: &mut TcpStream) -> Result<(), String> {
-    let mut buffer = [0; 2048];
-    let bytes_read = stream.read(&mut buffer).map_err(|e| e.to_string())?;
+fn handle_request(stream: &mut TcpStream) -> io::Result<()> {
+    let (headers, body_start_index) = read_headers_from_stream(stream)?;
+    let request_data = &headers[..body_start_index];
+    let initial_body = &headers[body_start_index..];
 
-    if bytes_read == 0 {
-        return Ok(());
-    }
+    let mut lines = request_data.split(|&b| b == b'\n').filter(|l| !l.is_empty());
+    let request_line = lines.next().ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Empty request"))?;
 
-    let request_data = &buffer[..bytes_read];
+    if request_line.starts_with(b"GET ") {
+        handle_get(request_line, stream)
+    } else if request_line.starts_with(b"POST /api/summarize") {
+        let content_length = get_content_length(request_data)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Content-Length header is required for POST"))?;
 
-    if request_data.starts_with(b"GET ") {
-        handle_get(request_data, stream.try_clone().unwrap()).map_err(|e| e.to_string())
-    } else if request_data.starts_with(b"POST /api/summarize") {
-        let (headers, body_start) = parse_headers(request_data).ok_or("Invalid headers")?;
-        let content_length = get_content_length(headers).ok_or("Missing Content-Length")?;
+        // Don't allocate any memory if body is too big to prevent OOM
+        if content_length > MAX_BODY_SIZE {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Request body too large"));
+        }
 
-        let body = read_body(request_data, body_start, content_length, stream)
-            .map_err(|e| e.to_string())?;
+        let body = read_body(initial_body, content_length, stream)?;
 
         let req: SummarizeRequest = serde_json::from_slice(&body)
-            .map_err(|e| format!("JSON error: {}", e))?;
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("JSON deserialization error: {}", e)))?;
 
-        let response = perform_summary_work(req)
-            .and_then(|res| serde_json::to_string(&res).map_err(|e| e.to_string()))
-            .map_err(|e| format!("Processing error: {}", e))?;
+        let response_payload = perform_summary_work(req)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Processing error: {}", e)))?;
 
-        let http_response = build_response("200 OK", "application/json", response.as_bytes());
-        stream.write_all(&http_response).map_err(|e| e.to_string())?;
-        stream.flush().map_err(|e| e.to_string())
+        let response_body = serde_json::to_string(&response_payload)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSON serialization error: {}", e)))?;
+
+        write_response(stream, "200 OK", "application/json", response_body.as_bytes())
     } else {
-        stream.write_all(NOT_FOUND_RESPONSE).map_err(|e| e.to_string())?;
-        stream.flush().map_err(|e| e.to_string())
+        write_error_response(stream, "404 Not Found", "Not Found")
     }
 }
 
-fn handle_get(request: &[u8], mut stream: TcpStream) -> io::Result<()> {
-    let path = request
-        .splitn(3, |&b| b == b' ')
-        .nth(1)
-        .unwrap_or(b"/");
-
-    let response = match path {
-        b"/" | b"/index.html" => build_static_response("text/html", HTML_RESPONSE),
-        b"/style.css" => build_static_response("text/css", CSS_RESPONSE),
-        b"/script.js" => build_static_response("application/javascript", JS_RESPONSE),
-        _ => NOT_FOUND_RESPONSE.to_vec(),
-    };
-
-    stream.write_all(&response)?;
-    stream.flush()
+fn handle_get(request_line: &[u8], stream: &mut TcpStream) -> io::Result<()> {
+    let path = request_line.split(|&b| b == b' ').nth(1).unwrap_or(b"/");
+    match path {
+        b"/" | b"/index.html" => write_static_response(stream, "text/html", HTML_RESPONSE),
+        b"/style.css" => write_static_response(stream, "text/css", CSS_RESPONSE),
+        b"/script.js" => write_static_response(stream, "application/javascript", JS_RESPONSE),
+        _ => write_error_response(stream, "404 Not Found", "Not Found"),
+    }
 }
 
 fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, String> {
@@ -199,45 +200,54 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
     })
 }
 
-fn build_static_response(content_type: &str, content: &[u8]) -> Vec<u8> {
-    format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Encoding: gzip\r\nContent-Length: {}\r\n\r\n",
-        content_type,
-        content.len()
-    )
-        .into_bytes()
-        .into_iter()
-        .chain(content.iter().cloned())
-        .collect()
+fn read_headers_from_stream(stream: &mut TcpStream) -> io::Result<(Vec<u8>, usize)> {
+    let mut buffer = Vec::with_capacity(1024);
+    let mut chunk = [0; 256];
+    loop {
+        let bytes_read = stream.read(&mut chunk)?;
+        if bytes_read == 0 {
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Connection closed while reading headers"));
+        }
+        buffer.extend_from_slice(&chunk[..bytes_read]);
+
+        if let Some(pos) = buffer.windows(4).position(|w| w == b"\r\n\r\n") {
+            let body_start_index = pos + 4;
+            return Ok((buffer, body_start_index));
+        }
+
+        if buffer.len() > MAX_HEADER_SIZE {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "Headers too large"));
+        }
+    }
 }
 
-fn build_response(status: &str, content_type: &str, content: &[u8]) -> Vec<u8> {
-    format!(
-        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
+fn write_response(stream: &mut TcpStream, status: &str, content_type: &str, content: &[u8]) -> io::Result<()> {
+    let headers = format!(
+        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         status,
         content_type,
         content.len()
-    )
-        .into_bytes()
-        .into_iter()
-        .chain(content.iter().cloned())
-        .collect()
-}
-
-fn write_error_response(stream: &mut TcpStream, status: &str, msg: &str) -> io::Result<()> {
-    let response = build_response(status, "text/plain", msg.as_bytes());
-    stream.write_all(&response)?;
+    );
+    stream.write_all(headers.as_bytes())?;
+    stream.write_all(content)?;
     stream.flush()
 }
 
-fn parse_headers(data: &[u8]) -> Option<(&[u8], usize)> {
-    data.windows(4)
-        .position(|w| w == b"\r\n\r\n")
-        .map(|pos| {
-            let headers_end = pos + 4;
-            (&data[..headers_end], headers_end)
-        })
+fn write_static_response(stream: &mut TcpStream, content_type: &str, content: &[u8]) -> io::Result<()> {
+    let headers = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Encoding: gzip\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        content_type,
+        content.len()
+    );
+    stream.write_all(headers.as_bytes())?;
+    stream.write_all(content)?;
+    stream.flush()
 }
+
+fn write_error_response(stream: &mut TcpStream, status: &str, msg: &str) -> io::Result<()> {
+    write_response(stream, status, "text/plain; charset=utf-8", msg.as_bytes())
+}
+
 
 fn get_content_length(headers: &[u8]) -> Option<usize> {
     let headers_str = std::str::from_utf8(headers).ok()?;
@@ -250,26 +260,18 @@ fn get_content_length(headers: &[u8]) -> Option<usize> {
 }
 
 fn read_body(
-    buffer: &[u8],
-    body_start: usize,
+    initial_data: &[u8],
     content_length: usize,
     stream: &mut TcpStream,
 ) -> io::Result<Vec<u8>> {
     let mut body = Vec::with_capacity(content_length);
-    let initial_body_data = &buffer[body_start..];
+    body.extend_from_slice(initial_data);
 
-    if initial_body_data.len() >= content_length {
-        body.extend_from_slice(&initial_body_data[..content_length]);
-        return Ok(body);
-    }
-
-    body.extend_from_slice(initial_body_data);
-    let remaining_bytes = content_length - initial_body_data.len();
+    let remaining_bytes = content_length.saturating_sub(initial_data.len());
 
     if remaining_bytes > 0 {
-        let mut rest_of_body = vec![0; remaining_bytes];
-        stream.read_exact(&mut rest_of_body)?;
-        body.extend_from_slice(&rest_of_body);
+        let mut remaining_body_reader = stream.take(remaining_bytes as u64); // Ensure we don't read more than content_length
+        remaining_body_reader.read_to_end(&mut body)?;
     }
 
     Ok(body)
