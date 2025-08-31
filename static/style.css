@@ -158,6 +158,14 @@
 }
 
 @layer components {
+    [data-lucide] {
+        width: 1.1em;
+        height: 1.1em;
+        stroke-width: 2;
+        vertical-align: middle;
+        pointer-events: none;
+    }
+    
     #new-summary-btn {
         width: 100%;
         padding: 0.8rem 1rem;
@@ -212,17 +220,22 @@
         padding: 0.75rem 2.5rem 0.75rem 1.25rem;
         color: var(--text-secondary);
         text-decoration: none;
-        white-space: nowrap;
-        overflow: hidden;
         transition: var(--transition-fast);
         font-weight: 500;
         font-size: 0.9rem;
         gap: 0.75rem;
         flex-grow: 1;
+        overflow: hidden; 
+    }
 
+    #saved-summaries-list li a > [data-lucide] {
+        flex-shrink: 0;
+    }
 
-        mask-image: linear-gradient(to right, black 80%, transparent 90%);
-        -webkit-mask-image: linear-gradient(to right, black 80%, transparent 90%);
+    #saved-summaries-list li a > span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     #saved-summaries-list li:hover:not(.active) {
@@ -371,30 +384,31 @@
         font-weight: 500;
         display: flex;
         align-items: center;
-        gap: 0.625rem;
+        justify-content: space-between;
         list-style: none;
         transition: var(--transition-fast);
+    }
+    
+    .settings-details summary > span {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
     }
 
     .settings-details summary:hover {
         background-color: var(--surface-2);
     }
 
-    .settings-details summary::after {
-        content: '\f078';
-        font-family: 'Font Awesome 6 Free';
-        font-weight: 900;
-        margin-left: auto;
-        transition: transform 0.3s ease;
-        font-size: 0.8rem;
+    .settings-details .chevron {
         color: var(--text-muted);
+        transition: transform 0.3s ease;
     }
 
     .settings-details[open]>summary {
         border-bottom: 1px solid var(--border-color);
     }
 
-    .settings-details[open] summary::after {
+    .settings-details[open] summary .chevron {
         transform: rotate(180deg);
     }
 
@@ -471,14 +485,16 @@
     }
 
     .settings-content input[type="checkbox"]::before {
-        content: "\f00c";
-        font-family: "Font Awesome 6 Free";
-        font-weight: 900;
-        font-size: 0.8em;
-        color: white;
+        content: "";
         position: absolute;
         top: 50%;
         left: 50%;
+        width: 0.8em;
+        height: 0.8em;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='20 6 9 17 4 12'/%3e%3c/svg%3e");
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: 100%;
         transform: translate(-50%, -50%) scale(0);
         transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
@@ -520,8 +536,10 @@
         margin: 0 1rem;    /* Adds space between the text and the icons */
     }
 
-    #summary-title i {
+    #summary-title [data-lucide] {
         color: var(--primary-color);
+        width: 1.3em;
+        height: 1.3em;
     }
 
     md-block {
@@ -656,16 +674,12 @@
         gap: 0.75rem;
     }
 
-    .summary-actions::after {
-        content: '\f078';
-        font-family: 'Font Awesome 6 Free';
-        font-weight: 900;
-        transition: transform 0.3s ease;
-        font-size: 0.8rem;
+    #transcript-details .chevron {
         color: var(--text-muted);
+        transition: transform 0.3s ease;
     }
 
-    #transcript-details[open] summary .summary-actions::after {
+    #transcript-details[open] summary .chevron {
         transform: rotate(180deg);
     }
 
@@ -855,17 +869,13 @@ body.sidebar-open #menu-toggle-btn {
         padding: 1rem;
     }
 
-    #transcript-details summary .summary-actions::after {
-        content: '\f078';
-        font-family: 'Font Awesome 6 Free';
-        font-weight: 900;
-        transition: transform 0.3s ease;
-        font-size: 0.8rem;
+    #transcript-details summary .summary-actions .chevron {
         color: var(--text-muted);
+        transition: transform 0.3s ease;
         margin-left: 0.5rem;
     }
 
-    #transcript-details[open] summary .summary-actions::after {
+    #transcript-details[open] summary .summary-actions .chevron {
         transform: rotate(180deg);
     }
 }

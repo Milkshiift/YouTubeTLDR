@@ -269,17 +269,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             this.renderSidebarList();
+            if (window.lucide) {
+                lucide.createIcons();
+            }
         },
 
         renderSidebarList() {
             dom.savedSummariesList.innerHTML = state.summaries.map((summary, index) => `
                 <li class="${index === state.activeSummaryIndex ? 'active' : ''}">
                     <a href="#" data-index="${index}" title="${this.escapeHtml(summary.name)}">
-                        <i class="fas fa-file-alt"></i>
+                        <i data-lucide="file-text"></i>
                         <span>${this.escapeHtml(summary.name)}</span>
                     </a>
                     <button class="delete-summary-btn" data-index="${index}" title="Delete summary">
-                        <i class="fas fa-trash-alt"></i>
+                        <i data-lucide="trash-2"></i>
                     </button>
                 </li>
             `).join('');
@@ -294,8 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const originalTitle = button.title;
             try {
                 await navigator.clipboard.writeText(text);
-                button.innerHTML = '<i class="fas fa-check"></i>';
+                button.innerHTML = '<i data-lucide="check"></i>';
                 button.title = 'Copied!';
+                if (window.lucide) lucide.createIcons();
             } catch (err) {
                 console.error('Failed to copy: ', err);
                 button.title = 'Failed to copy';
@@ -303,6 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => {
                     button.innerHTML = originalIcon;
                     button.title = originalTitle;
+                    if (window.lucide) lucide.createIcons();
                 }, 2000);
             }
         },

@@ -8,31 +8,30 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com/" crossorigin>
     <link rel="preconnect" href="https://rsms.me/" crossorigin>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" media="print" onload="this.media='all'"/>
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" media="print" onload="this.media='all'">
     <script type="module" src="https://md-block.verou.me/md-block.js" defer></script>
 </head>
 <body>
     <div class="app-container">
         <button id="menu-toggle-btn" title="Toggle Menu">
-            <i class="fas fa-bars"></i>
+            <i data-lucide="menu"></i>
         </button>
         <aside id="sidebar">
             <header class="sidebar-header">
                 <button id="new-summary-btn">
-                    <i class="fas fa-plus"></i> New Summary
+                    <i data-lucide="plus"></i> New Summary
                 </button>
                 <button id="close-sidebar-btn" class="icon-btn" title="Close Menu">
-                    <i class="fas fa-times"></i>
+                    <i data-lucide="x"></i>
                 </button>
             </header>
             <section id="saved-summaries-section">
-                <h2><i class="fas fa-history"></i> History</h2>
+                <h2><i data-lucide="history"></i> History</h2>
                 <ul id="saved-summaries-list"></ul>
             </section>
             <footer class="sidebar-footer">
                 <button id="clear-summaries-btn">
-                    <i class="fas fa-trash-alt"></i> Clear History
+                    <i data-lucide="trash-2"></i> Clear History
                 </button>
             </footer>
         </aside>
@@ -45,28 +44,28 @@
                 </header>
                 <form id="summary-form">
                     <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=..." required>
-                    <button type="submit">Summarize <i class="fas fa-arrow-right"></i></button>
+                    <button type="submit">Summarize <i data-lucide="arrow-right"></i></button>
                 </form>
                  <details class="settings-details">
-                    <summary><i class="fas fa-cog"></i> Advanced Settings</summary>
+                    <summary><span><i data-lucide="settings"></i> Advanced Settings</span><i data-lucide="chevron-down" class="chevron"></i></summary>
                      <div class="settings-content">
                          <div>
                              <label for="api-key">
-                                 <i class="fas fa-key"></i> Gemini API Key
+                                 <i data-lucide="key-round"></i> Gemini API Key
                              </label>
                              <input type="password" id="api-key" placeholder="AIzaSy...">
                          </div>
 
                          <div>
                              <label for="model">
-                                 <i class="fas fa-brain"></i> Model
+                                 <i data-lucide="brain-circuit"></i> Model
                              </label>
                              <input type="text" id="model" placeholder="gemini-2.5-flash">
                          </div>
 
                          <div>
                              <label for="system-prompt">
-                                 <i class="fas fa-terminal"></i> System Prompt
+                                 <i data-lucide="terminal"></i> System Prompt
                              </label>
                              <textarea id="system-prompt" rows="6" placeholder="Enter custom instructions for the AI..."></textarea>
                          </div>
@@ -74,14 +73,14 @@
                          <div class="checkbox-group">
                              <input type="checkbox" id="dry-run">
                              <label for="dry-run">
-                                 <i class="fas fa-flask"></i> Dry Run (skip YouTube and Gemini network calls and show Markdown test)
+                                 <i data-lucide="flask-conical"></i> Dry Run (skip YouTube and Gemini network calls and show Markdown test)
                              </label>
                          </div>
 
                          <div class="checkbox-group">
                              <input type="checkbox" id="transcript-only">
                              <label for="transcript-only">
-                                 <i class="fas fa-closed-captioning"></i> Transcript Only (skip Gemini summarization)
+                                 <i data-lucide="captions"></i> Transcript Only (skip Gemini summarization)
                              </label>
                          </div>
                      </div>
@@ -99,11 +98,11 @@
 
                 <div id="summary-container" class="hidden">
                     <h2 id="summary-title">
-                        <i class="fa-regular fa-file-lines"></i>
+                        <i data-lucide="file-text"></i>
                         <span id="summary-title-text">Summary</span>
                         <div style="width: min-content">
-                            <a id="video-link" href="#" target="_blank" class="icon-btn" title="View Video"><i class="fas fa-video"></i></a>
-                            <button id="copy-summary-btn" class="icon-btn" title="Copy Summary"><i class="fas fa-copy"></i></button>
+                            <a id="video-link" href="#" target="_blank" class="icon-btn" title="View Video"><i data-lucide="video"></i></a>
+                            <button id="copy-summary-btn" class="icon-btn" title="Copy Summary"><i data-lucide="copy"></i></button>
                         </div>
                     </h2>
                     <md-block id="summary-output"></md-block>
@@ -112,9 +111,10 @@
                 <div id="transcript-section" class="hidden">
                     <details id="transcript-details">
                         <summary>
-                            <span><i class="fas fa-scroll"></i> View Raw Transcript</span>
+                            <span><i data-lucide="scroll-text"></i> View Raw Transcript</span>
                             <span class="summary-actions">
-                                <button id="copy-transcript-btn" class="icon-btn" title="Copy Transcript"><i class="fas fa-copy"></i></button>
+                                <button id="copy-transcript-btn" class="icon-btn" title="Copy Transcript"><i data-lucide="copy"></i></button>
+                                <i data-lucide="chevron-down" class="chevron"></i>
                             </span>
                         </summary>
                         <pre id="transcript-text"></pre>
@@ -126,5 +126,9 @@
     </div>
 
     <script src="script.js" defer></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script>
+      lucide.createIcons();
+    </script>
 </body>
 </html>
