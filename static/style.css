@@ -44,6 +44,8 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         color-scheme: dark;
+        scrollbar-width: thin;
+        scrollbar-color: var(--surface-3) transparent;
 
         @supports (font-variation-settings: normal) {
             font-family: "InterVariable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -64,25 +66,6 @@
     h4 {
         font-weight: 600;
         letter-spacing: -0.02em;
-    }
-
-    ::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: var(--surface-3);
-        border-radius: 5px;
-        border: 2px solid var(--surface-bg);
-
-        &:hover {
-            background: var(--border-color);
-        }
     }
 
     ::selection {
