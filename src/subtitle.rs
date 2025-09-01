@@ -163,7 +163,20 @@ fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&
     manual_track
         .or(punctuated_asr_track)
         .or(plain_asr_track)
-        .ok_or_else(|| format!("No suitable captions found for language '{}'", language).into())
+        .ok_or_else(|| {
+            let available_languages: Vec<String> = tracks
+                .iter()
+                .map(|track| track.language_code.clone())
+                .collect();
+            let unique_languages: Vec<String> = available_languages.into_iter().collect::<std::collections::HashSet<String>>().into_iter().collect();
+            let joined_languages = unique_languages.join(", ");
+
+            format!(
+                "No suitable captions found for language '{}'. Available languages: [{}]",
+                language,
+                joined_languages
+            ).into()
+        })
 }
 
 fn process_json_captions(events: Vec<JsonCaptionEvent>) -> String {

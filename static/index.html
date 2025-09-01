@@ -47,7 +47,7 @@
                     <button type="submit">Summarize <i data-lucide="arrow-right"></i></button>
                 </form>
                  <details class="settings-details">
-                    <summary><span><i data-lucide="settings"></i> Advanced Settings</span><i data-lucide="chevron-down" class="chevron"></i></summary>
+                    <summary><span><i data-lucide="settings"></i> Settings</span><i data-lucide="chevron-down" class="chevron"></i></summary>
                      <div class="settings-content">
                          <div>
                              <label for="api-key">
@@ -64,23 +64,30 @@
                          </div>
 
                          <div>
+                             <label for="language">
+                                 <i data-lucide="languages"></i> Language
+                             </label>
+                             <input type="text" id="language" placeholder="en">
+                         </div>
+
+                         <div>
                              <label for="system-prompt">
                                  <i data-lucide="terminal"></i> System Prompt
                              </label>
-                             <textarea id="system-prompt" rows="6" placeholder="Enter custom instructions for the AI..."></textarea>
-                         </div>
-
-                         <div class="checkbox-group">
-                             <input type="checkbox" id="dry-run">
-                             <label for="dry-run">
-                                 <i data-lucide="flask-conical"></i> Dry Run (skip YouTube and Gemini network calls and show Markdown test)
-                             </label>
+                             <textarea id="system-prompt" rows="6" placeholder="Enter custom instructions for Gemini..."></textarea>
                          </div>
 
                          <div class="checkbox-group">
                              <input type="checkbox" id="transcript-only">
                              <label for="transcript-only">
                                  <i data-lucide="captions"></i> Transcript Only (skip Gemini summarization)
+                             </label>
+                         </div>
+
+                         <div class="checkbox-group">
+                             <input type="checkbox" id="dry-run">
+                             <label for="dry-run">
+                                 <i data-lucide="flask-conical"></i> Dry Run (skip YouTube and Gemini network calls and show Markdown test)
                              </label>
                          </div>
                      </div>

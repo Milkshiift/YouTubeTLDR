@@ -16,6 +16,7 @@ struct SummarizeRequest {
     api_key: Option<String>,
     model: Option<String>,
     system_prompt: Option<String>,
+    language: Option<String>,
     dry_run: bool,
     transcript_only: bool,
 }
@@ -175,7 +176,7 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
         });
     }
 
-    let (transcript, video_name) = get_video_data(&req.url, "en")
+    let (transcript, video_name) = get_video_data(&req.url, &req.language.unwrap_or("en".to_string()))
         .map_err(|e| format!("Transcript error: {}", e))?;
 
     if req.transcript_only {
