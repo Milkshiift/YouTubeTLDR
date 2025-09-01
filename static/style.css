@@ -177,6 +177,7 @@
         stroke-width: 2;
         vertical-align: middle;
         pointer-events: none;
+        flex-shrink: 0;
     }
 
     #new-summary-btn {
@@ -537,10 +538,6 @@
         @media (max-width: 800px) {
             padding: 1.5rem;
         }
-    }
-
-    #summary-title > *:not(#summary-title-text) {
-        flex-shrink: 0;
     }
 
     #summary-title {
