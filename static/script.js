@@ -44,18 +44,11 @@ document.addEventListener('DOMContentLoaded', () => {
         loader: document.getElementById('loader'),
         errorMessage: document.getElementById('error-message'),
         summaryContainer: document.getElementById('summary-container'),
-        summaryTitleText: document.getElementById('summary-title-text'),
-        summaryOutput: document.getElementById('summary-output'),
-        transcriptSection: document.getElementById('transcript-section'),
-        transcriptText: document.getElementById('transcript-text'),
-        copySummaryBtn: document.getElementById('copy-summary-btn'),
-        copyTranscriptBtn: document.getElementById('copy-transcript-btn'),
-        videoLink: document.getElementById('video-link'),
     };
 
     const state = {
-        summaries: [],
-        activeSummaryIndex: -1,
+        summaries: [], // Persisted history of all summaries
+        currentBatch: [], // Summaries currently being displayed in the main view
         isLoading: false,
         error: null,
     };
@@ -74,27 +67,41 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.newSummaryBtn.addEventListener('click', this.handleNewSummary.bind(this));
             dom.savedSummariesList.addEventListener('click', this.handleSidebarClick.bind(this));
 
-            dom.copySummaryBtn.addEventListener('click', (e) => this.handleCopyClick(e, dom.summaryOutput.mdContent, dom.copySummaryBtn));
-            dom.copyTranscriptBtn.addEventListener('click', (e) => this.handleCopyClick(e, dom.transcriptText.textContent, dom.copyTranscriptBtn));
+            // Event delegation for dynamically created elements
+            dom.summaryContainer.addEventListener('click', (e) => {
+                const copySummaryBtn = e.target.closest('.copy-summary-btn');
+                const copyTranscriptBtn = e.target.closest('.copy-transcript-btn');
+                const downloadBtn = e.target.closest('#download-all-btn');
+
+                if (copySummaryBtn) {
+                    const summaryOutput = copySummaryBtn.closest('.summary-item').querySelector('.summary-output');
+                    this.handleCopyClick(e, summaryOutput.mdContent, copySummaryBtn);
+                }
+                if (copyTranscriptBtn) {
+                    const transcriptText = copyTranscriptBtn.closest('.transcript-section').querySelector('.transcript-text');
+                    this.handleCopyClick(e, transcriptText.textContent, copyTranscriptBtn);
+                }
+                if(downloadBtn) {
+                    this.handleDownloadAll();
+                }
+            });
 
             [dom.menuToggleBtn, dom.closeSidebarBtn, dom.sidebarOverlay].forEach(el => {
                 if (el) el.addEventListener('click', () => this.toggleSidebar());
             });
 
-            [dom.apiKey, dom.model, dom.systemPrompt].forEach(el => el.addEventListener('change', this.saveSettings));
+            [dom.apiKey, dom.model, dom.language, dom.systemPrompt].forEach(el => el.addEventListener('change', this.saveSettings));
             [dom.dryRun, dom.transcriptOnly].forEach(el => el.addEventListener('change', this.saveSettings));
         },
 
         loadSummaries() {
             state.summaries = JSON.parse(localStorage.getItem(config.storageKeys.summaries)) || [];
-            if (state.summaries.length > 0) {
-                state.activeSummaryIndex = 0;
-            }
+            this.renderSidebarList();
         },
 
         saveSummaries() {
             localStorage.setItem(config.storageKeys.summaries, JSON.stringify(state.summaries));
-            this.render();
+            this.renderSidebarList();
         },
 
         loadSettings() {
@@ -117,9 +124,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async handleFormSubmit(event) {
             event.preventDefault();
-            const url = dom.urlInput.value.trim();
-            if (!url) {
-                state.error = "Please enter a YouTube URL.";
+            const urls = dom.urlInput.value.trim().split('\n').map(url => url.trim()).filter(url => url);
+            if (urls.length === 0) {
+                state.error = "Please enter at least one YouTube URL.";
                 this.render();
                 return;
             }
@@ -127,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             this.saveSettings();
             state.isLoading = true;
             state.error = null;
-            state.activeSummaryIndex = -1;
+            state.currentBatch = [];
             this.render();
 
             try {
@@ -135,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        url,
+                        urls,
                         api_key: dom.apiKey.value,
                         model: dom.model.value,
                         language: dom.language.value,
@@ -155,34 +162,67 @@ document.addEventListener('DOMContentLoaded', () => {
                             errorMsg = errorData.error;
                         }
                     } catch (e) {
-                        // Not JSON, or JSON without .error, use text as is.
+                        // Not JSON, use text as is.
                     }
                     throw new Error(errorMsg || `Server error: ${response.status}`);
                 }
 
-                const data = JSON.parse(responseText);
-
-                const newSummary = {
+                const results = JSON.parse(responseText);
+                state.currentBatch = results.map((data, index) => ({
                     name: data.video_name,
                     summary: data.summary,
                     transcript: data.subtitles,
-                    url: url
-                };
+                    url: urls.find(u => u === data.url) // Ensure correct URL is mapped
+                }));
 
-                state.summaries.unshift(newSummary);
-                state.activeSummaryIndex = 0;
+                // Add the new batch to the top of the history
+                state.summaries.unshift(...state.currentBatch);
+                this.saveSummaries();
 
             } catch (error) {
                 console.error('Summarization failed:', error);
                 state.error = error.message;
             } finally {
                 state.isLoading = false;
-                this.saveSummaries();
+                this.render();
+            }
+        },
+
+        async handleDownloadAll() {
+            if (state.currentBatch.length === 0) return;
+
+            try {
+                const response = await fetch(`${config.baseURL}/api/download`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(state.currentBatch)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Download failed: ${errorText || response.statusText}`);
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'summaries.zip';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+
+            } catch (error) {
+                console.error('Download failed:', error);
+                state.error = `Download failed: ${error.message}`;
+                this.render();
             }
         },
 
         handleNewSummary() {
-            state.activeSummaryIndex = -1;
+            state.currentBatch = [];
             state.error = null;
             dom.urlInput.value = '';
             this.render();
@@ -192,9 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
         handleClearSummaries() {
             if (confirm('Are you sure you want to clear all saved summaries?')) {
                 state.summaries = [];
-                state.activeSummaryIndex = -1;
+                state.currentBatch = [];
                 state.error = null;
                 this.saveSummaries();
+                this.render();
             }
         },
 
@@ -204,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (deleteBtn) {
                 e.preventDefault();
+                e.stopPropagation();
                 const index = parseInt(deleteBtn.dataset.index, 10);
                 this.deleteSummary(index);
                 return;
@@ -211,7 +253,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (link) {
                 e.preventDefault();
-                state.activeSummaryIndex = parseInt(link.dataset.index, 10);
+                const index = parseInt(link.dataset.index, 10);
+                // When a history item is clicked, display just that one.
+                state.currentBatch = [state.summaries[index]];
                 state.error = null;
                 this.render();
                 if (this.isMobile()) this.toggleSidebar(false);
@@ -223,23 +267,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!summaryToDelete) return;
 
             if (confirm(`Are you sure you want to delete the summary for "${summaryToDelete.name}"?`)) {
-                state.summaries.splice(indexToDelete, 1);
-
-                if (state.activeSummaryIndex === indexToDelete) {
-                    state.activeSummaryIndex = -1;
-                    state.error = null; // Clear error if the active (and possibly error-causing) summary is deleted
-                } else if (state.activeSummaryIndex > indexToDelete) {
-                    state.activeSummaryIndex--;
+                // If the item being deleted is the one currently displayed, clear the view.
+                if (state.currentBatch.length === 1 && state.currentBatch[0].url === summaryToDelete.url) {
+                    state.currentBatch = [];
                 }
 
+                state.summaries.splice(indexToDelete, 1);
                 this.saveSummaries();
+                this.render();
             }
         },
 
         render() {
-            const hasActiveSummary = state.activeSummaryIndex > -1;
-            const currentSummary = hasActiveSummary ? state.summaries[state.activeSummaryIndex] : null;
-            const shouldShowSummaryView = state.isLoading || hasActiveSummary || state.error;
+            const hasBatchResults = state.currentBatch.length > 0;
+            const shouldShowSummaryView = state.isLoading || hasBatchResults || state.error;
 
             dom.welcomeView.classList.toggle('hidden', shouldShowSummaryView);
             dom.summaryView.classList.toggle('hidden', !shouldShowSummaryView);
@@ -250,28 +291,76 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.errorMessage.style.display = state.error ? 'block' : 'none';
             dom.errorMessage.textContent = state.error || '';
 
-            dom.summaryContainer.classList.toggle('hidden', !currentSummary || hasStatus);
-            dom.transcriptSection.classList.toggle('hidden', true);
+            dom.summaryContainer.classList.toggle('hidden', !hasBatchResults || hasStatus);
+            dom.summaryContainer.innerHTML = ''; // Clear previous results
 
-            if (currentSummary) {
-                dom.summaryTitleText.textContent = currentSummary.name;
-                dom.videoLink.href = currentSummary.url;
-                dom.summaryOutput.mdContent = currentSummary.summary;
-                if (currentSummary.transcript && currentSummary.transcript.trim()) {
-                    dom.transcriptText.textContent = currentSummary.transcript;
-                    dom.transcriptSection.classList.remove('hidden');
+            if (hasBatchResults) {
+                if (state.currentBatch.length > 0) {
+                    const downloadBtnHTML = `
+                        <div class="batch-actions">
+                            <button id="download-all-btn" class="primary-btn">
+                                <i data-lucide="download"></i> Download All (${state.currentBatch.length} summaries)
+                            </button>
+                        </div>`;
+                    dom.summaryContainer.innerHTML += downloadBtnHTML;
                 }
+
+                state.currentBatch.forEach(summary => {
+                    const summaryEl = this.createSummaryElement(summary);
+                    dom.summaryContainer.appendChild(summaryEl);
+                });
             }
 
             this.renderSidebarList();
+
             if (window.lucide) {
                 lucide.createIcons();
             }
         },
 
+        createSummaryElement(summary) {
+            const div = document.createElement('div');
+            div.className = 'summary-item';
+
+            const transcriptHTML = summary.transcript && summary.transcript.trim() ? `
+                <div class="transcript-section">
+                    <details class="transcript-details">
+                        <summary>
+                            <span><i data-lucide="scroll-text"></i> View Raw Transcript</span>
+                            <span class="summary-actions">
+                                <button class="copy-transcript-btn icon-btn" title="Copy Transcript"><i data-lucide="copy"></i></button>
+                                <i data-lucide="chevron-down" class="chevron"></i>
+                            </span>
+                        </summary>
+                        <pre class="transcript-text">${this.escapeHtml(summary.transcript)}</pre>
+                    </details>
+                </div>
+            ` : '';
+
+            div.innerHTML = `
+                <h2 class="summary-title">
+                    <i data-lucide="file-text"></i>
+                    <span class="summary-title-text">${this.escapeHtml(summary.name)}</span>
+                    <div style="width: min-content; display: inline-flex; gap: 0.5rem;">
+                        <a href="${summary.url}" target="_blank" class="icon-btn" title="View Video"><i data-lucide="video"></i></a>
+                        <button class="copy-summary-btn icon-btn" title="Copy Summary"><i data-lucide="copy"></i></button>
+                    </div>
+                </h2>
+                <md-block class="summary-output">${summary.summary}</md-block>
+                ${transcriptHTML}
+            `;
+
+            // Manually set mdContent for the md-block
+            div.querySelector('.summary-output').mdContent = summary.summary;
+            return div;
+        },
+
         renderSidebarList() {
-            dom.savedSummariesList.innerHTML = state.summaries.map((summary, index) => `
-                <li class="${index === state.activeSummaryIndex ? 'active' : ''}">
+            dom.savedSummariesList.innerHTML = state.summaries.map((summary, index) => {
+                // Check if the current history item is being displayed in the main view
+                const isViewing = state.currentBatch.length === 1 && state.currentBatch[0].url === summary.url;
+                return `
+                <li class="${isViewing ? 'active' : ''}">
                     <a href="#" data-index="${index}" title="${this.escapeHtml(summary.name)}">
                         <i data-lucide="file-text"></i>
                         <span>${this.escapeHtml(summary.name)}</span>
@@ -280,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i data-lucide="trash-2"></i>
                     </button>
                 </li>
-            `).join('');
+            `}).join('');
         },
 
         async handleCopyClick(e, text, button) {
@@ -331,23 +420,16 @@ window.addEventListener('error', event => {
     console.error('Uncaught error:', event.error);
 });
 
-// https://stackoverflow.com/a/65996386
 async function copyToClipboard(textToCopy) {
-    // Navigator clipboard api needs a secure context (https)
     if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(textToCopy);
     } else {
-        // Use the 'out of viewport hidden text area' trick
         const textArea = document.createElement("textarea");
         textArea.value = textToCopy;
-
-        // Move textarea out of the viewport so it's not visible
         textArea.style.position = "absolute";
         textArea.style.left = "-999999px";
-
         document.body.prepend(textArea);
         textArea.select();
-
         try {
             document.execCommand('copy');
         } catch (error) {

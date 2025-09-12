@@ -40,10 +40,10 @@
             <div id="welcome-view">
                 <header>
                     <h1>YouTube TLDR</h1>
-                    <p id="description">Enter a YouTube URL to get an AI-generated summary.</p>
+                    <p id="description">Enter one or more YouTube URLs (one per line) to get AI-generated summaries.</p>
                 </header>
                 <form id="summary-form">
-                    <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=..." required>
+                    <textarea id="youtube-url" placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/watch?v=..." required rows="5"></textarea>
                     <button type="submit">Summarize <i data-lucide="arrow-right"></i></button>
                 </form>
                  <details class="settings-details">

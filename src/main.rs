@@ -3,16 +3,18 @@ mod gemini;
 
 use crate::subtitle::get_video_data;
 use crossbeam_channel::{bounded, Receiver, Sender};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::io::{self, Read, Write};
+use std::io::{self, Cursor, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::time::Duration;
+use zip::write::{FileOptions, ZipWriter};
 
 #[derive(Deserialize)]
 struct SummarizeRequest {
-    url: String,
+    urls: Vec<String>,
     api_key: Option<String>,
     model: Option<String>,
     system_prompt: Option<String>,
@@ -21,11 +23,12 @@ struct SummarizeRequest {
     transcript_only: bool,
 }
 
-#[derive(Serialize)]
-struct SummarizeResponse {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct SummaryResult {
     summary: String,
     subtitles: String,
     video_name: String,
+    url: String,
 }
 
 struct WorkItem {
@@ -104,20 +107,13 @@ fn handle_connection(stream: TcpStream, sender: &Sender<WorkItem>) -> io::Result
 
 fn worker(id: usize, receiver: Receiver<WorkItem>) {
     println!("   Worker {} started", id);
-    loop {
-        match receiver.recv() {
-            Ok(mut work_item) => {
-                if let Err(e) = handle_request(&mut work_item.stream) {
-                    eprintln!("❌ Worker {} error: {}", id, e);
-                    let _ = write_error_response(&mut work_item.stream, "500 Internal Server Error", &e.to_string());
-                }
-            }
-            Err(_) => {
-                println!("   Worker {} shutting down", id);
-                break;
-            }
+    while let Ok(mut work_item) = receiver.recv() {
+        if let Err(e) = handle_request(&mut work_item.stream) {
+            eprintln!("❌ Worker {} error: {}", id, e);
+            let _ = write_error_response(&mut work_item.stream, "500 Internal Server Error", &e.to_string());
         }
     }
+    println!("   Worker {} shutting down", id);
 }
 
 fn handle_request(stream: &mut TcpStream) -> io::Result<()> {
@@ -125,32 +121,27 @@ fn handle_request(stream: &mut TcpStream) -> io::Result<()> {
     let request_data = &headers[..body_start_index];
     let initial_body = &headers[body_start_index..];
 
-    let mut lines = request_data.split(|&b| b == b'\n').filter(|l| !l.is_empty());
-    let request_line = lines.next().ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Empty request"))?;
+    let request_line = request_data.split(|&b| b == b'\n').next()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Empty request"))?;
 
     if request_line.starts_with(b"GET ") {
-        handle_get(request_line, stream)
-    } else if request_line.starts_with(b"POST /api/summarize") {
-        let content_length = get_content_length(request_data)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Content-Length header is required for POST"))?;
+        return handle_get(request_line, stream);
+    }
 
-        // Don't allocate any memory if body is too big to prevent OOM
-        if content_length > MAX_BODY_SIZE {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Request body too large"));
-        }
+    // All other routes are POST and require a body
+    let content_length = get_content_length(request_data)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Content-Length header is required for POST"))?;
 
-        let body = read_body(initial_body, content_length, stream)?;
+    if content_length > MAX_BODY_SIZE {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "Request body too large"));
+    }
 
-        let req: SummarizeRequest = serde_json::from_slice(&body)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("JSON deserialization error: {}", e)))?;
+    let body = read_body(initial_body, content_length, stream)?;
 
-        let response_payload = perform_summary_work(req)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Processing error: {}", e)))?;
-
-        let response_body = serde_json::to_string(&response_payload)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSON serialization error: {}", e)))?;
-
-        write_response(stream, "200 OK", "application/json", response_body.as_bytes())
+    if request_line.starts_with(b"POST /api/summarize") {
+        handle_summarize_post(&body, stream)
+    } else if request_line.starts_with(b"POST /api/download") {
+        handle_download_post(&body, stream)
     } else {
         write_error_response(stream, "404 Not Found", "Not Found")
     }
@@ -166,39 +157,101 @@ fn handle_get(request_line: &[u8], stream: &mut TcpStream) -> io::Result<()> {
     }
 }
 
-fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, String> {
+fn handle_summarize_post(body: &[u8], stream: &mut TcpStream) -> io::Result<()> {
+    let req: SummarizeRequest = serde_json::from_slice(body)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("JSON deserialization error: {}", e)))?;
+
+    let results: Vec<Result<SummaryResult, String>> = req.urls
+        .par_iter()
+        .map(|url| perform_summary_work(url, &req))
+        .collect();
+
+    // Separate successful from failed results.
+    let (successful_summaries, errors): (Vec<_>, Vec<_>) = results.into_iter().partition(Result::is_ok);
+    let successful_summaries: Vec<SummaryResult> = successful_summaries.into_iter().map(Result::unwrap).collect();
+
+    if successful_summaries.is_empty() {
+        let error_messages: Vec<String> = errors.into_iter().map(Result::unwrap_err).collect();
+        let combined_errors = format!("Failed to process all URLs. Errors: {}", error_messages.join(", "));
+        return write_error_response(stream, "500 Internal Server Error", &combined_errors);
+    }
+
+    let response_body = serde_json::to_string(&successful_summaries)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSON serialization error: {}", e)))?;
+
+    write_response(stream, "200 OK", "application/json", response_body.as_bytes())
+}
+
+fn handle_download_post(body: &[u8], stream: &mut TcpStream) -> io::Result<()> {
+    let results: Vec<SummaryResult> = serde_json::from_slice(body)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("JSON deserialization error for download: {}", e)))?;
+
+    let zip_data = create_zip_archive(results)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("ZIP creation error: {}", e)))?;
+
+    write_response(stream, "200 OK", "application/zip", &zip_data)
+}
+
+fn perform_summary_work(url: &str, req: &SummarizeRequest) -> Result<SummaryResult, String> {
     if req.dry_run {
         let test_md = include_str!("./markdown_test.md").to_string();
-        return Ok(SummarizeResponse {
+        return Ok(SummaryResult {
             summary: test_md.clone(),
             subtitles: test_md,
             video_name: "Dry Run".into(),
+            url: url.to_string(),
         });
     }
 
-    let (transcript, video_name) = get_video_data(&req.url, &req.language.unwrap_or("en".to_string()))
-        .map_err(|e| format!("Transcript error: {}", e))?;
+    let (transcript, video_name) = get_video_data(url, &req.language.clone().unwrap_or("en".to_string()))
+        .map_err(|e| format!("Transcript error for {}: {}", url, e))?;
 
     if req.transcript_only {
-        return Ok(SummarizeResponse {
+        return Ok(SummaryResult {
             summary: transcript.clone(),
             subtitles: transcript,
             video_name,
+            url: url.to_string(),
         });
     }
 
-    let api_key = req.api_key.as_deref().filter(|k| !k.is_empty()).ok_or("Missing Gemini API key. Get one here: https://aistudio.google.com/app/apikey")?;
+    let api_key = req.api_key.as_deref().filter(|k| !k.is_empty()).ok_or("Missing Gemini API key")?;
     let model = req.model.as_deref().filter(|m| !m.is_empty()).ok_or("Missing model name")?;
     let system_prompt = req.system_prompt.as_deref().filter(|p| !p.is_empty()).ok_or("Missing system prompt")?;
 
     let summary = gemini::summarize(api_key, model, system_prompt, &transcript)
-        .map_err(|e| format!("API error: {}", e))?;
+        .map_err(|e| format!("API error for {}: {}", url, e))?;
 
-    Ok(SummarizeResponse {
+    Ok(SummaryResult {
         summary,
         subtitles: transcript,
         video_name,
+        url: url.to_string(),
     })
+}
+
+fn create_zip_archive(results: Vec<SummaryResult>) -> io::Result<Vec<u8>> {
+    let mut buffer = Cursor::new(Vec::new());
+    {
+        let mut zip = ZipWriter::new(&mut buffer);
+        let options: FileOptions<()> = FileOptions::default();
+
+        for result in results {
+            let sanitized_name = result.video_name.chars().filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-').collect::<String>().replace(" ", "_");
+
+            let summary_filename = format!("{}_summary.md", sanitized_name);
+            zip.start_file(summary_filename, options)?;
+            zip.write_all(result.summary.as_bytes())?;
+
+            if !result.subtitles.is_empty() {
+                let transcript_filename = format!("{}_transcript.txt", sanitized_name);
+                zip.start_file(transcript_filename, options)?;
+                zip.write_all(result.subtitles.as_bytes())?;
+            }
+        }
+        zip.finish()?;
+    }
+    Ok(buffer.into_inner())
 }
 
 fn read_headers_from_stream(stream: &mut TcpStream) -> io::Result<(Vec<u8>, usize)> {
@@ -224,7 +277,7 @@ fn read_headers_from_stream(stream: &mut TcpStream) -> io::Result<(Vec<u8>, usiz
 
 fn write_response(stream: &mut TcpStream, status: &str, content_type: &str, content: &[u8]) -> io::Result<()> {
     let headers = format!(
-        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
         status,
         content_type,
         content.len()
@@ -246,7 +299,8 @@ fn write_static_response(stream: &mut TcpStream, content_type: &str, content: &[
 }
 
 fn write_error_response(stream: &mut TcpStream, status: &str, msg: &str) -> io::Result<()> {
-    write_response(stream, status, "text/plain; charset=utf-8", msg.as_bytes())
+    let error_body = format!("{{\"error\":\"{}\"}}", msg.replace("\"", "\\\""));
+    write_response(stream, status, "application/json; charset=utf-8", error_body.as_bytes())
 }
 
 
@@ -271,7 +325,7 @@ fn read_body(
     let remaining_bytes = content_length.saturating_sub(initial_data.len());
 
     if remaining_bytes > 0 {
-        let mut remaining_body_reader = stream.take(remaining_bytes as u64); // Ensure we don't read more than content_length
+        let mut remaining_body_reader = stream.take(remaining_bytes as u64);
         remaining_body_reader.read_to_end(&mut body)?;
     }
 
