@@ -89,7 +89,7 @@ pub fn summarize(
     });
 
     let response = minreq::post(req_url)
-        .with_timeout(45) // 45 second timeout, summarization can be slow
+        .with_timeout(120)
         .with_json(&body)
         .map_err(Error::Request)?
         .send()
