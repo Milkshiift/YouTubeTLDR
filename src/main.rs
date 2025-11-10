@@ -145,10 +145,10 @@ fn handle_request(stream: &mut TcpStream) -> io::Result<()> {
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("JSON deserialization error: {}", e)))?;
 
         let response_payload = perform_summary_work(req)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Processing error: {}", e)))?;
+            .map_err(|e| io::Error::other(format!("Processing error: {}", e)))?;
 
         let response_body = serde_json::to_string(&response_payload)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSON serialization error: {}", e)))?;
+            .map_err(|e| io::Error::other(format!("JSON serialization error: {}", e)))?;
 
         write_response(stream, "200 OK", "application/json", response_body.as_bytes())
     } else {

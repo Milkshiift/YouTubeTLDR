@@ -102,9 +102,8 @@ pub fn summarize(
 
     let reply: GeminiResponse = response.json().map_err(Error::Request)?;
 
-    reply.candidates
-        .get(0)
-        .and_then(|c| c.content.parts.get(0))
+    reply.candidates.first()
+        .and_then(|c| c.content.parts.first())
         .map(|p| p.text.clone())
         .ok_or(Error::NoTextInResponse)
 }

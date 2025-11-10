@@ -22,7 +22,7 @@ fn main() {
     if let Ok(js_code) = fs::read_to_string(&js_path) {
         let minified_js = minifier::js::minify(&js_code);
         
-        compress_with_gzip(&minified_js.to_string().as_bytes(), &gz_js_path)
+        compress_with_gzip(minified_js.to_string().as_bytes(), &gz_js_path)
             .expect("Failed to compress minified JS with Gzip");
     } else {
         eprintln!("Warning: Could not read {}", js_path.display());
@@ -36,7 +36,7 @@ fn main() {
         let minified_css = minifier::css::minify(&css_code)
             .expect("Failed to minify CSS");
         
-        compress_with_gzip(&minified_css.to_string().as_bytes(), &gz_css_path)
+        compress_with_gzip(minified_css.to_string().as_bytes(), &gz_css_path)
             .expect("Failed to compress minified CSS with Gzip");
     } else {
         eprintln!("Warning: Could not read {}", css_path.display());

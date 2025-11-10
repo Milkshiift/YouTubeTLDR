@@ -152,10 +152,8 @@ fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&
                 }
             }
 
-            else {
-                if plain_asr_track.is_none() {
-                    plain_asr_track = Some(track);
-                }
+            else if plain_asr_track.is_none() {
+                plain_asr_track = Some(track);
             }
         }
     }
