@@ -2,13 +2,13 @@ mod subtitle;
 mod gemini;
 
 use crate::subtitle::get_video_data;
-use crossbeam_channel::{bounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::time::Duration;
+use flume::{bounded, Receiver, Sender};
 
 #[derive(Deserialize)]
 struct SummarizeRequest {
@@ -93,10 +93,10 @@ fn handle_connection(stream: TcpStream, sender: &Sender<WorkItem>) -> io::Result
 
     match sender.try_send(work_item) {
         Ok(()) => Ok(()),
-        Err(crossbeam_channel::TrySendError::Full(_)) => {
+        Err(flume::TrySendError::Full(_)) => {
             write_error_response(&mut stream_clone, "503 Service Unavailable", "Server is busy, please try again later.")
         }
-        Err(crossbeam_channel::TrySendError::Disconnected(_)) => {
+        Err(flume::TrySendError::Disconnected(_)) => {
             write_error_response(&mut stream_clone, "500 Internal Server Error", "Worker pool has been disconnected.")
         }
     }
