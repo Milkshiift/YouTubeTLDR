@@ -37,13 +37,13 @@
       {
         packages.default = youtubetldr;
 
-        devShells.default = pkgs.mkShell {
-          inputsFrom = [ youtubetldr ];
-          nativeBuildInputs = with pkgs; [
-            openssl
-            pkg-config
-          ];
-          LD_LIBRARY_PATH = with pkgs; lib.makeLibraryPath [ openssl ];
+        devShells = {
+          default = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              openssl
+              pkg-config
+            ];
+          };
         };
       }) // {
         nixosModules.default = { config, pkgs, ... }:
