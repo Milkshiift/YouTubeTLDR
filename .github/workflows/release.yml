@@ -103,6 +103,7 @@ jobs:
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{github.ref_name}}
           name: ${{ startsWith(github.ref, 'refs/tags/') && format('Release {0}', github.ref_name) || format('Build from {0}', github.ref_name) }}
           draft: true
           generate_release_notes: true
