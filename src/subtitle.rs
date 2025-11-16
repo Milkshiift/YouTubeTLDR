@@ -56,7 +56,7 @@ struct CaptionSegment {
 }
 
 
-const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
 const YOUTUBE_REFERER: &str = "https://www.youtube.com/";
 const YOUTUBE_BASE_URL: &str = "https://www.youtube.com";
 
@@ -83,7 +83,7 @@ fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(String, S
             "context": {
                 "client": {
                     "clientName": "WEB",
-                    "clientVersion": "2.20250626.01.00"
+                    "clientVersion": "2.20251113.00.00"
                 }
             },
             "videoId": video_id
