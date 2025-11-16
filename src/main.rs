@@ -2,7 +2,6 @@ mod subtitle;
 mod gemini;
 
 use crate::subtitle::get_video_data;
-use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::{self, Read, Write, BufReader, BufRead};
 use std::net::{TcpListener, TcpStream, SocketAddr};
@@ -10,6 +9,7 @@ use std::thread;
 use std::time::Duration;
 use flume::{bounded, Receiver};
 use std::sync::Arc;
+use miniserde::{json, Deserialize, Serialize};
 
 #[derive(Deserialize)]
 struct SummarizeRequest {
@@ -18,9 +18,7 @@ struct SummarizeRequest {
     model: Option<String>,
     system_prompt: Option<String>,
     language: Option<String>,
-    #[serde(default)]
     dry_run: bool,
-    #[serde(default)]
     transcript_only: bool,
 }
 
@@ -208,14 +206,13 @@ fn handle_request(stream: &mut TcpStream, config: &ServerConfig, buffer: &mut Ve
             reader.read_exact(buffer)?;
 
             // Process
-            let req: SummarizeRequest = serde_json::from_slice(buffer)
+            let req: SummarizeRequest = json::from_slice(buffer)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Invalid JSON: {}", e)))?;
 
             let response_payload = perform_summary_work(req)
                 .map_err(|e| io::Error::other(format!("Processing error: {}", e)))?;
 
-            let response_body = serde_json::to_vec(&response_payload)
-                .map_err(|e| io::Error::other(format!("JSON serialization error: {}", e)))?;
+            let response_body = json::to_vec(&response_payload);
 
             write_response(stream, "200 OK", "application/json", &response_body)
         }

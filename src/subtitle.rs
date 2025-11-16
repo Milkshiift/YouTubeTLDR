@@ -1,10 +1,10 @@
-use serde::Deserialize;
 use std::error::Error;
+use miniserde::{json, Deserialize};
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct PlayerDataResponse {
     captions: Option<Captions>,
+    #[serde(rename = "videoDetails")]
     video_details: Option<VideoDetails>,
 }
 
@@ -14,21 +14,22 @@ struct VideoDetails {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct Captions {
+    #[serde(rename = "playerCaptionsTracklistRenderer")]
     player_captions_tracklist_renderer: Option<PlayerCaptionsTracklistRenderer>,
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct PlayerCaptionsTracklistRenderer {
+    #[serde(rename = "captionTracks")]
     caption_tracks: Vec<CaptionTrack>,
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct CaptionTrack {
+    #[serde(rename = "baseUrl")]
     base_url: String,
+    #[serde(rename = "languageCode")]
     language_code: String,
 }
 
@@ -38,10 +39,8 @@ struct JsonCaptionResponse {
 }
 
 #[derive(Deserialize)]
-#[serde(untagged)]
-enum JsonCaptionEvent {
-    CaptionEvent { segs: Option<Vec<CaptionSegment>> },
-    Other(()),
+struct JsonCaptionEvent {
+    segs: Option<Vec<CaptionSegment>>,
 }
 
 #[derive(Deserialize)]
@@ -60,20 +59,26 @@ pub fn get_video_data(video_url: &str, language: &str) -> Result<(String, String
 }
 
 fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(String, String), Box<dyn Error>> {
-    let player_data: PlayerDataResponse = minreq::post(format!("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&key={}", API_KEY))
-        .with_header("User-Agent", USER_AGENT)
-        .with_header("Referer", "https://www.youtube.com/")
-        .with_json(&serde_json::json!({
-            "context": {
-                "client": {
+    let request_body = format!(
+        r#"{{
+            "context": {{
+                "client": {{
                     "clientName": "WEB",
                     "clientVersion": "2.20251113.00.00"
-                }
-            },
-            "videoId": video_id
-        }))?
-        .send()?
-        .json()?;
+                }}
+            }},
+            "videoId": "{}"
+        }}"#,
+        video_id
+    );
+
+    let player_response = minreq::post(format!("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&key={}", API_KEY))
+        .with_header("User-Agent", USER_AGENT)
+        .with_header("Referer", "https://www.youtube.com/")
+        .with_body(request_body)
+        .send()?;
+
+    let player_data: PlayerDataResponse = json::from_slice(player_response.as_bytes())?;
 
     let video_title = player_data
         .video_details
@@ -86,12 +91,10 @@ fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(String, S
         .map(|r| r.caption_tracks)
         .ok_or_else(|| format!("No captions found for video: {}", video_id))?;
 
-    // Find best caption track
     let track = select_best_track(&tracks, language)?;
 
-    // Get and process captions
     let url = format!("{}&fmt=json3", track.base_url.replace("\\u0026", "&"));
-    let caption_response: JsonCaptionResponse = minreq::get(url).send()?.json()?;
+    let caption_response: JsonCaptionResponse = json::from_slice(minreq::get(url).send()?.as_bytes())?;
     let transcript = process_json_captions(caption_response.events);
 
     Ok((transcript, video_title))
@@ -116,16 +119,18 @@ fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&
 
     for track in tracks {
         if track.language_code == language {
-            let track_priority = match &track.base_url {
-                url if !url.contains("kind=asr") => 0,  // Manual
-                url if url.contains("variant=punctuated") => 1,  // Punctuated ASR
-                _ => 2,  // Plain ASR
+            let track_priority = if !track.base_url.contains("kind=asr") {
+                0 // Manual
+            } else if track.base_url.contains("variant=punctuated") {
+                1 // Punctuated ASR
+            } else {
+                2 // Plain ASR
             };
 
             if track_priority < priority {
                 best = Some(track);
                 priority = track_priority;
-                if priority == 0 { break; }  // Found manual, stop searching
+                if priority == 0 { break; } // Found manual, stop searching
             }
         }
     }
@@ -140,7 +145,7 @@ fn process_json_captions(events: Vec<JsonCaptionEvent>) -> String {
     let mut result = String::with_capacity(events.len() * 50);
 
     for event in events {
-        if let JsonCaptionEvent::CaptionEvent { segs: Some(segs) } = event {
+        if let Some(segs) = event.segs {
             for seg in segs {
                 let text = seg.utf8.trim();
                 if !text.is_empty() {
