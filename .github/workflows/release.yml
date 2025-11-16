@@ -28,6 +28,7 @@ jobs:
           toolchain: nightly
           override: true
           cache: true
+          components: rust-src
 
       - name: Get Target Triple
         id: get_target
