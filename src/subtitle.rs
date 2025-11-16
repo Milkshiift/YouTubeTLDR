@@ -1,5 +1,5 @@
+use miniserde::{Deserialize, json};
 use std::error::Error;
-use miniserde::{json, Deserialize};
 
 #[derive(Deserialize)]
 struct PlayerDataResponse {
@@ -52,13 +52,16 @@ const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 const API_KEY: &str = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 
 pub fn get_video_data(video_url: &str, language: &str) -> Result<(String, String), Box<dyn Error>> {
-    let video_id = extract_video_id(video_url)
-        .ok_or_else(|| format!("Invalid YouTube URL: {}", video_url))?;
+    let video_id =
+        extract_video_id(video_url).ok_or_else(|| format!("Invalid YouTube URL: {}", video_url))?;
 
     get_transcript_and_title(&video_id, language)
 }
 
-fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(String, String), Box<dyn Error>> {
+fn get_transcript_and_title(
+    video_id: &str,
+    language: &str,
+) -> Result<(String, String), Box<dyn Error>> {
     let request_body = format!(
         r#"{{
             "context": {{
@@ -72,11 +75,14 @@ fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(String, S
         video_id
     );
 
-    let player_response = minreq::post(format!("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&key={}", API_KEY))
-        .with_header("User-Agent", USER_AGENT)
-        .with_header("Referer", "https://www.youtube.com/")
-        .with_body(request_body)
-        .send()?;
+    let player_response = minreq::post(format!(
+        "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&key={}",
+        API_KEY
+    ))
+    .with_header("User-Agent", USER_AGENT)
+    .with_header("Referer", "https://www.youtube.com/")
+    .with_body(request_body)
+    .send()?;
 
     let player_data: PlayerDataResponse = json::from_slice(player_response.as_bytes())?;
 
@@ -94,7 +100,8 @@ fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(String, S
     let track = select_best_track(&tracks, language)?;
 
     let url = format!("{}&fmt=json3", track.base_url.replace("\\u0026", "&"));
-    let caption_response: JsonCaptionResponse = json::from_slice(minreq::get(url).send()?.as_bytes())?;
+    let caption_response: JsonCaptionResponse =
+        json::from_slice(minreq::get(url).send()?.as_bytes())?;
     let transcript = process_json_captions(caption_response.events);
 
     Ok((transcript, video_title))
@@ -112,7 +119,10 @@ fn extract_video_id(url: &str) -> Option<&str> {
     None
 }
 
-fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&'a CaptionTrack, Box<dyn Error>> {
+fn select_best_track<'a>(
+    tracks: &'a [CaptionTrack],
+    language: &str,
+) -> Result<&'a CaptionTrack, Box<dyn Error>> {
     // manual > punctuated ASR > plain ASR
     let mut best = None;
     let mut priority = 999;
@@ -130,7 +140,9 @@ fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&
             if track_priority < priority {
                 best = Some(track);
                 priority = track_priority;
-                if priority == 0 { break; } // Found manual, stop searching
+                if priority == 0 {
+                    break;
+                } // Found manual, stop searching
             }
         }
     }

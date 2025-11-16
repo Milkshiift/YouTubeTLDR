@@ -1,13 +1,10 @@
+use miniserde::{Deserialize, Serialize, json};
 use std::fmt;
-use miniserde::{json, Deserialize, Serialize};
 
 #[derive(Debug)]
 pub enum Error {
     Request(minreq::Error),
-    ApiError {
-        status: u16,
-        body: String,
-    },
+    ApiError { status: u16, body: String },
     Json(miniserde::Error),
     NoTextInResponse,
 }
@@ -112,14 +109,14 @@ pub fn summarize(
 
     let request_body = GeminiRequest {
         system_instruction: SystemInstruction {
-            parts: vec![PartRequest { text: system_prompt }],
+            parts: vec![PartRequest {
+                text: system_prompt,
+            }],
         },
-        contents: vec![
-            ContentRequest {
-                role: "user",
-                parts: vec![PartRequest { text: transcript }],
-            }
-        ],
+        contents: vec![ContentRequest {
+            role: "user",
+            parts: vec![PartRequest { text: transcript }],
+        }],
         generation_config: GenerationConfig {
             temperature: 1.0,
             top_k: 64,
@@ -128,11 +125,23 @@ pub fn summarize(
             stop_sequences: vec![],
         },
         safety_settings: vec![
-            SafetySetting { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            SafetySetting { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            SafetySetting { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            SafetySetting { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-        ]
+            SafetySetting {
+                category: "HARM_CATEGORY_HARASSMENT",
+                threshold: "BLOCK_NONE",
+            },
+            SafetySetting {
+                category: "HARM_CATEGORY_HATE_SPEECH",
+                threshold: "BLOCK_NONE",
+            },
+            SafetySetting {
+                category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                threshold: "BLOCK_NONE",
+            },
+            SafetySetting {
+                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                threshold: "BLOCK_NONE",
+            },
+        ],
     };
 
     let body_str = json::to_vec(&request_body);
@@ -151,8 +160,7 @@ pub fn summarize(
         });
     }
 
-    let reply: GeminiResponse = json::from_slice(response.as_bytes())
-        .map_err(Error::Json)?;
+    let reply: GeminiResponse = json::from_slice(response.as_bytes()).map_err(Error::Json)?;
 
     reply
         .candidates

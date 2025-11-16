@@ -1,15 +1,15 @@
-mod subtitle;
 mod gemini;
+mod subtitle;
 
 use crate::subtitle::get_video_data;
+use flume::{Receiver, bounded};
+use miniserde::{Deserialize, Serialize, json};
 use std::env;
-use std::io::{self, Read, Write, BufReader, BufRead};
-use std::net::{TcpListener, TcpStream, SocketAddr};
+use std::io::{self, BufRead, BufReader, Read, Write};
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use flume::{bounded, Receiver};
-use std::sync::Arc;
-use miniserde::{json, Deserialize, Serialize};
 
 #[derive(Deserialize)]
 struct SummarizeRequest {
@@ -76,7 +76,11 @@ macro_rules! static_resource {
 
 static_resource!(HTML_RESOURCE, "index.html", "text/html; charset=utf-8");
 static_resource!(CSS_RESOURCE, "style.css", "text/css; charset=utf-8");
-static_resource!(JS_RESOURCE, "script.js", "application/javascript; charset=utf-8");
+static_resource!(
+    JS_RESOURCE,
+    "script.js",
+    "application/javascript; charset=utf-8"
+);
 
 fn main() -> io::Result<()> {
     let config = Arc::new(ServerConfig::from_env());
@@ -136,14 +140,22 @@ fn worker(id: usize, receiver: Receiver<WorkItem>, config: Arc<ServerConfig>) {
 
         if let Err(e) = handle_request(&mut work_item.stream, &config, &mut buffer) {
             eprintln!("❌ Worker {} error handling {}: {}", id, work_item.addr, e);
-            let _ = write_error_response(&mut work_item.stream, "500 Internal Server Error", &e.to_string());
+            let _ = write_error_response(
+                &mut work_item.stream,
+                "500 Internal Server Error",
+                &e.to_string(),
+            );
         }
     }
 
     println!("   Worker {} shutting down", id);
 }
 
-fn handle_request(stream: &mut TcpStream, config: &ServerConfig, buffer: &mut Vec<u8>) -> io::Result<()> {
+fn handle_request(
+    stream: &mut TcpStream,
+    config: &ServerConfig,
+    buffer: &mut Vec<u8>,
+) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(8192, stream.try_clone()?);
 
     let mut request_line = String::new();
@@ -155,7 +167,10 @@ fn handle_request(stream: &mut TcpStream, config: &ServerConfig, buffer: &mut Ve
 
     let parts: Vec<&str> = request_line.split_whitespace().collect();
     if parts.len() < 2 {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid request line"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid request line",
+        ));
     }
 
     let method = parts[0];
@@ -173,7 +188,10 @@ fn handle_request(stream: &mut TcpStream, config: &ServerConfig, buffer: &mut Ve
                 let bytes_read = reader.read_line(&mut line)?;
 
                 if bytes_read == 0 {
-                    return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Unexpected EOF"));
+                    return Err(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "Unexpected EOF",
+                    ));
                 }
 
                 if line == "\r\n" || line == "\n" {
@@ -189,15 +207,22 @@ fn handle_request(stream: &mut TcpStream, config: &ServerConfig, buffer: &mut Ve
                 headers.push(line);
 
                 if headers.len() > 100 {
-                    return Err(io::Error::new(io::ErrorKind::InvalidData, "Too many headers"));
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Too many headers",
+                    ));
                 }
             }
 
-            let content_length = content_length
-                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Missing Content-Length"))?;
+            let content_length = content_length.ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "Missing Content-Length")
+            })?;
 
             if content_length > config.max_body_size {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, "Request body too large"));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Request body too large",
+                ));
             }
 
             // Read body
@@ -206,8 +231,9 @@ fn handle_request(stream: &mut TcpStream, config: &ServerConfig, buffer: &mut Ve
             reader.read_exact(buffer)?;
 
             // Process
-            let req: SummarizeRequest = json::from_slice(buffer)
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Invalid JSON: {}", e)))?;
+            let req: SummarizeRequest = json::from_slice(buffer).map_err(|e| {
+                io::Error::new(io::ErrorKind::InvalidData, format!("Invalid JSON: {}", e))
+            })?;
 
             let response_payload = perform_summary_work(req)
                 .map_err(|e| io::Error::other(format!("Processing error: {}", e)))?;
@@ -251,13 +277,20 @@ fn write_static_response(stream: &mut TcpStream, resource: &StaticResource) -> i
     stream.flush()
 }
 
-fn write_response(stream: &mut TcpStream, status: &str, content_type: &str, content: &[u8]) -> io::Result<()> {
+fn write_response(
+    stream: &mut TcpStream,
+    status: &str,
+    content_type: &str,
+    content: &[u8],
+) -> io::Result<()> {
     let response = format!(
         "HTTP/1.1 {}\r\n\
          Content-Type: {}\r\n\
          Content-Length: {}\r\n\
          Connection: close\r\n\r\n",
-        status, content_type, content.len()
+        status,
+        content_type,
+        content.len()
     );
 
     stream.write_all(response.as_bytes())?;
@@ -280,8 +313,8 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
     }
 
     let language = req.language.as_deref().unwrap_or("en");
-    let (transcript, video_name) = get_video_data(&req.url, language)
-        .map_err(|e| format!("Transcript error: {}", e))?;
+    let (transcript, video_name) =
+        get_video_data(&req.url, language).map_err(|e| format!("Transcript error: {}", e))?;
 
     if req.transcript_only {
         return Ok(SummarizeResponse {
@@ -291,17 +324,19 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
         });
     }
 
-    let api_key = req.api_key
-        .as_deref()
-        .filter(|k| !k.is_empty())
-        .ok_or("Missing Gemini API key. Get one here: https://aistudio.google.com/app/apikey")?;
+    let api_key =
+        req.api_key.as_deref().filter(|k| !k.is_empty()).ok_or(
+            "Missing Gemini API key. Get one here: https://aistudio.google.com/app/apikey",
+        )?;
 
-    let model = req.model
+    let model = req
+        .model
         .as_deref()
         .filter(|m| !m.is_empty())
         .ok_or("Missing model name")?;
 
-    let system_prompt = req.system_prompt
+    let system_prompt = req
+        .system_prompt
         .as_deref()
         .filter(|p| !p.is_empty())
         .ok_or("Missing system prompt")?;
