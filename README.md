@@ -24,7 +24,7 @@
 
 YouTubeTLDR embraces simplicity — maximum functionality with minimal overhead.
 
-*   🪶 **Featherweight & Zero Bloat:** Single binary ~**0.6MB**. No databases, no Tokio, no frameworks
+*   🪶 **Featherweight & Zero Bloat:** Single binary ~**0.3MB**. No databases, no Tokio, no frameworks
 *   ⚡ **Lightning Fast:** Pure Rust + vanilla HTML/JS
 *   🔑 **BYOK:** Bring Your Own Key. Uses your Google Gemini API directly — no proxies, no data collection
 *   🎯 **Single Purpose:** Just generates and saves summaries, that's it
