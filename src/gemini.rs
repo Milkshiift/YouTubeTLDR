@@ -4,7 +4,7 @@ use std::fmt;
 #[derive(Debug)]
 pub enum Error {
     Request(minreq::Error),
-    ApiError { status: u16, body: String },
+    Api { status: u16, body: String },
     Json(miniserde::Error),
     NoTextInResponse,
 }
@@ -13,7 +13,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Request(_) => write!(f, "Failed to send request to the Gemini API"),
-            Error::ApiError { status, body } => {
+            Error::Api { status, body } => {
                 write!(f, "Gemini API returned an error (status {status}): {body}")
             }
             Error::Json(_) => write!(f, "Failed to parse a response from the Gemini API"),
@@ -27,7 +27,7 @@ impl std::error::Error for Error {
         match self {
             Error::Request(e) => Some(e),
             Error::Json(e) => Some(e),
-            Error::ApiError { .. } | Error::NoTextInResponse => None,
+            Error::Api { .. } | Error::NoTextInResponse => None,
         }
     }
 }
@@ -154,7 +154,7 @@ pub fn summarize(
 
     if !(200..=299).contains(&response.status_code) {
         let body = response.as_str().unwrap_or("No response body").to_string();
-        return Err(Error::ApiError {
+        return Err(Error::Api {
             status: response.status_code as u16,
             body,
         });

@@ -55,7 +55,7 @@ pub fn get_video_data(video_url: &str, language: &str) -> Result<(String, String
     let video_id =
         extract_video_id(video_url).ok_or_else(|| format!("Invalid YouTube URL: {}", video_url))?;
 
-    get_transcript_and_title(&video_id, language)
+    get_transcript_and_title(video_id, language)
 }
 
 fn get_transcript_and_title(

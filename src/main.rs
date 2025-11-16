@@ -198,10 +198,9 @@ fn handle_request(
                     break;
                 }
 
-                if line.to_lowercase().starts_with("content-length:") {
-                    if let Some(value) = line.split(':').nth(1) {
+                if line.to_lowercase().starts_with("content-length:")
+                    && let Some(value) = line.split(':').nth(1) {
                         content_length = value.trim().parse().ok();
-                    }
                 }
 
                 headers.push(line);
