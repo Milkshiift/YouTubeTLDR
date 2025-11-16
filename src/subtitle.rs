@@ -1,6 +1,5 @@
-use serde::{Deserialize};
+use serde::Deserialize;
 use std::error::Error;
-
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,13 +40,8 @@ struct JsonCaptionResponse {
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum JsonCaptionEvent {
-    CaptionEvent {
-        segs: Option<Vec<CaptionSegment>>,
-    },
-    MetadataEvent {
-        #[serde(flatten)]
-        _extra: serde_json::Value,
-    },
+    CaptionEvent { segs: Option<Vec<CaptionSegment>> },
+    Other(()),
 }
 
 #[derive(Deserialize)]
@@ -55,30 +49,20 @@ struct CaptionSegment {
     utf8: String,
 }
 
-
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
-const YOUTUBE_REFERER: &str = "https://www.youtube.com/";
-const YOUTUBE_BASE_URL: &str = "https://www.youtube.com";
-
+const API_KEY: &str = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 
 pub fn get_video_data(video_url: &str, language: &str) -> Result<(String, String), Box<dyn Error>> {
     let video_id = extract_video_id(video_url)
-        .ok_or_else(|| format!("Invalid or unsupported YouTube URL: {}", video_url))?;
+        .ok_or_else(|| format!("Invalid YouTube URL: {}", video_url))?;
 
-    let (transcript, video_name) = get_transcript_and_title(&video_id, language)?;
-
-    Ok((transcript, video_name))
+    get_transcript_and_title(&video_id, language)
 }
 
-
 fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(String, String), Box<dyn Error>> {
-    let api_key = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
-
-    let player_url = format!("{}/youtubei/v1/player?key={}", YOUTUBE_BASE_URL, api_key);
-
-    let player_data_response = minreq::post(player_url)
+    let player_data: PlayerDataResponse = minreq::post(format!("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&key={}", API_KEY))
         .with_header("User-Agent", USER_AGENT)
-        .with_header("Referer", YOUTUBE_REFERER)
+        .with_header("Referer", "https://www.youtube.com/")
         .with_json(&serde_json::json!({
             "context": {
                 "client": {
@@ -89,116 +73,85 @@ fn get_transcript_and_title(video_id: &str, language: &str) -> Result<(String, S
             "videoId": video_id
         }))?
         .send()?
-        .json::<PlayerDataResponse>()?;
+        .json()?;
 
-    let video_title = player_data_response
+    let video_title = player_data
         .video_details
-        .ok_or("Video details not found in API response. Server IP likely blocked by YouTube.")?
+        .ok_or("Video not found or server IP blocked by YouTube")?
         .title;
 
-    let tracks = player_data_response
+    let tracks = player_data
         .captions
         .and_then(|c| c.player_captions_tracklist_renderer)
         .map(|r| r.caption_tracks)
-        .ok_or_else(|| format!("No captions found for video ID: {}", video_id))?;
+        .ok_or_else(|| format!("No captions found for video: {}", video_id))?;
 
+    // Find best caption track
     let track = select_best_track(&tracks, language)?;
-    let captions_url = format_captions_url(&track.base_url);
 
-    let caption_res = minreq::get(captions_url).send()?;
-    let caption_json_str = caption_res.as_str()?;
-
-    let json_response: JsonCaptionResponse = serde_json::from_str(caption_json_str)
-        .map_err(|e| format!("Failed to parse captions JSON: {}\nResponse: {}", e, caption_json_str))?;
-
-    let transcript = process_json_captions(json_response.events);
+    // Get and process captions
+    let url = format!("{}&fmt=json3", track.base_url.replace("\\u0026", "&"));
+    let caption_response: JsonCaptionResponse = minreq::get(url).send()?.json()?;
+    let transcript = process_json_captions(caption_response.events);
 
     Ok((transcript, video_title))
 }
 
-fn extract_video_id(url: &str) -> Option<String> {
-    let extract_id = |s: &str| s.chars().take(11).collect::<String>();
+fn extract_video_id(url: &str) -> Option<&str> {
+    const PATTERNS: &[&str] = &["v=", "/embed/", "/live/", "/v/", "/shorts/", "youtu.be/"];
 
-    url.split_once("v=")
-        .or_else(|| url.split_once("/embed/"))
-        .or_else(|| url.split_once("/v/"))
-        .or_else(|| url.split_once("/shorts/"))
-        .or_else(|| url.split_once("youtu.be/"))
-        .map(|(_, after)| extract_id(after))
-}
-
-fn format_captions_url(base_url: &str) -> String {
-    // The base URL from the API may contain unicode-escaped ampersands.
-    format!("{}&fmt=json3", base_url.replace("\\u0026", "&"))
+    for pattern in PATTERNS {
+        if let Some(pos) = url.find(pattern) {
+            let start = pos + pattern.len();
+            return url.get(start..start + 11);
+        }
+    }
+    None
 }
 
 fn select_best_track<'a>(tracks: &'a [CaptionTrack], language: &str) -> Result<&'a CaptionTrack, Box<dyn Error>> {
-    let mut manual_track = None;
-    let mut punctuated_asr_track = None;
-    let mut plain_asr_track = None;
+    // manual > punctuated ASR > plain ASR
+    let mut best = None;
+    let mut priority = 999;
 
     for track in tracks {
         if track.language_code == language {
-            let url = &track.base_url;
+            let track_priority = match &track.base_url {
+                url if !url.contains("kind=asr") => 0,  // Manual
+                url if url.contains("variant=punctuated") => 1,  // Punctuated ASR
+                _ => 2,  // Plain ASR
+            };
 
-            if !url.contains("kind=asr") {
-                manual_track = Some(track);
-                break;
-            }
-
-            if url.contains("variant=punctuated") {
-                if punctuated_asr_track.is_none() {
-                    punctuated_asr_track = Some(track);
-                }
-            }
-
-            else if plain_asr_track.is_none() {
-                plain_asr_track = Some(track);
+            if track_priority < priority {
+                best = Some(track);
+                priority = track_priority;
+                if priority == 0 { break; }  // Found manual, stop searching
             }
         }
     }
 
-    manual_track
-        .or(punctuated_asr_track)
-        .or(plain_asr_track)
-        .ok_or_else(|| {
-            let available_languages: Vec<String> = tracks
-                .iter()
-                .map(|track| track.language_code.clone())
-                .collect();
-            let unique_languages: Vec<String> = available_languages.into_iter().collect::<std::collections::HashSet<String>>().into_iter().collect();
-            let joined_languages = unique_languages.join(", ");
-
-            format!(
-                "No suitable captions found for language '{}'. Available languages: [{}]",
-                language,
-                joined_languages
-            ).into()
-        })
+    best.ok_or_else(|| {
+        let available: Vec<_> = tracks.iter().map(|t| &t.language_code).collect();
+        format!("No captions for '{}'. Available: {:?}", language, available).into()
+    })
 }
 
 fn process_json_captions(events: Vec<JsonCaptionEvent>) -> String {
-    events
-        .into_iter()
-        .filter_map(|event| {
-            match event {
-                JsonCaptionEvent::CaptionEvent { segs: Some(segs), .. } => {
-                    let caption_text: String = segs
-                        .iter()
-                        .map(|s| s.utf8.trim())
-                        .filter(|s| !s.is_empty())
-                        .collect::<Vec<&str>>()
-                        .join(" ");
+    let mut result = String::with_capacity(events.len() * 50);
 
-                    if caption_text.is_empty() {
-                        None
-                    } else {
-                        Some(caption_text)
+    for event in events {
+        if let JsonCaptionEvent::CaptionEvent { segs: Some(segs) } = event {
+            for seg in segs {
+                let text = seg.utf8.trim();
+                if !text.is_empty() {
+                    if !result.is_empty() {
+                        result.push(' ');
                     }
+                    result.push_str(text);
                 }
-                _ => None,
             }
-        })
-        .collect::<Vec<String>>()
-        .join(" ")
+        }
+    }
+
+    result
 }
