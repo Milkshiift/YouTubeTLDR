@@ -48,7 +48,7 @@ impl ServerConfig {
         let port = env::var("TLDR_PORT").unwrap_or_else(|_| "8000".into());
 
         Self {
-            addr: format!("{}:{}", ip, port),
+            addr: format!("{ip}:{port}"),
             num_workers: env::var("TLDR_WORKERS")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -96,7 +96,7 @@ fn main() -> io::Result<()> {
     for id in 0..config.num_workers {
         let receiver = receiver.clone();
         let config = Arc::clone(&config);
-        thread::spawn(move || worker(id, receiver, config));
+        thread::spawn(move || worker(id, &receiver, &config));
     }
 
     println!("▶️ Ready to accept requests");
@@ -107,7 +107,7 @@ fn main() -> io::Result<()> {
                 let addr = match stream.peer_addr() {
                     Ok(addr) => addr,
                     Err(e) => {
-                        eprintln!("❌ Failed to get peer address: {}", e);
+                        eprintln!("❌ Failed to get peer address: {e}");
                         continue;
                     }
                 };
@@ -119,26 +119,26 @@ fn main() -> io::Result<()> {
                 let work_item = WorkItem { stream, addr };
 
                 if sender.try_send(work_item).is_err() {
-                    eprintln!("⚠️ Queue full, rejecting connection from {}", addr);
+                    eprintln!("⚠️ Queue full, rejecting connection from {addr}");
                 }
             }
             Err(e) => {
-                eprintln!("❌ Accept failed: {}", e);
+                eprintln!("❌ Accept failed: {e}");
             }
         }
     }
     Ok(())
 }
 
-fn worker(id: usize, receiver: Receiver<WorkItem>, config: Arc<ServerConfig>) {
-    println!("   Worker {} started", id);
+fn worker(id: usize, receiver: &Receiver<WorkItem>, config: &Arc<ServerConfig>) {
+    println!("   Worker {id} started");
 
     let mut buffer = Vec::with_capacity(4096);
 
     while let Ok(mut work_item) = receiver.recv() {
         buffer.clear();
 
-        if let Err(e) = handle_request(&mut work_item.stream, &config, &mut buffer) {
+        if let Err(e) = handle_request(&mut work_item.stream, config, &mut buffer) {
             eprintln!("❌ Worker {} error handling {}: {}", id, work_item.addr, e);
             let _ = write_error_response(
                 &mut work_item.stream,
@@ -148,7 +148,7 @@ fn worker(id: usize, receiver: Receiver<WorkItem>, config: Arc<ServerConfig>) {
         }
     }
 
-    println!("   Worker {} shutting down", id);
+    println!("   Worker {id} shutting down");
 }
 
 fn handle_request(
@@ -231,11 +231,11 @@ fn handle_request(
 
             // Process
             let req: SummarizeRequest = json::from_slice(buffer).map_err(|e| {
-                io::Error::new(io::ErrorKind::InvalidData, format!("Invalid JSON: {}", e))
+                io::Error::new(io::ErrorKind::InvalidData, format!("Invalid JSON: {e}"))
             })?;
 
-            let response_payload = perform_summary_work(req)
-                .map_err(|e| io::Error::other(format!("Processing error: {}", e)))?;
+            let response_payload = perform_summary_work(&req)
+                .map_err(|e| io::Error::other(format!("Processing error: {e}")))?;
 
             let response_body = json::to_vec(&response_payload);
 
@@ -301,7 +301,7 @@ fn write_error_response(stream: &mut TcpStream, status: &str, msg: &str) -> io::
     write_response(stream, status, "text/plain; charset=utf-8", msg.as_bytes())
 }
 
-fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, String> {
+fn perform_summary_work(req: &SummarizeRequest) -> Result<SummarizeResponse, String> {
     if req.dry_run {
         let test_md = include_str!("./markdown_test.md");
         return Ok(SummarizeResponse {
@@ -313,7 +313,7 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
 
     let language = req.language.as_deref().unwrap_or("en");
     let (transcript, video_name) =
-        get_video_data(&req.url, language).map_err(|e| format!("Transcript error: {}", e))?;
+        get_video_data(&req.url, language).map_err(|e| format!("Transcript error: {e}"))?;
 
     if req.transcript_only {
         return Ok(SummarizeResponse {
@@ -341,7 +341,7 @@ fn perform_summary_work(req: SummarizeRequest) -> Result<SummarizeResponse, Stri
         .ok_or("Missing system prompt")?;
 
     let summary = gemini::summarize(api_key, model, system_prompt, &transcript)
-        .map_err(|e| format!("API error: {}", e))?;
+        .map_err(|e| format!("API error: {e}"))?;
 
     Ok(SummarizeResponse {
         summary,

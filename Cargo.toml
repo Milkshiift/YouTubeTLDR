@@ -32,3 +32,10 @@ trim-paths = "all"
 [profile.dev]
 opt-level = 1
 incremental = true
+
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+cast_sign_loss = "allow"
+cast_possible_truncation = "allow"

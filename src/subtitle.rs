@@ -53,7 +53,7 @@ const API_KEY: &str = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 
 pub fn get_video_data(video_url: &str, language: &str) -> Result<(String, String), Box<dyn Error>> {
     let video_id =
-        extract_video_id(video_url).ok_or_else(|| format!("Invalid YouTube URL: {}", video_url))?;
+        extract_video_id(video_url).ok_or_else(|| format!("Invalid YouTube URL: {video_url}"))?;
 
     get_transcript_and_title(video_id, language)
 }
@@ -70,15 +70,11 @@ fn get_transcript_and_title(
                     "clientVersion": "2.20251113.00.00"
                 }}
             }},
-            "videoId": "{}"
-        }}"#,
-        video_id
+            "videoId": "{video_id}"
+        }}"#
     );
 
-    let player_response = minreq::post(format!(
-        "https://www.youtube.com/youtubei/v1/player?prettyPrint=false&key={}",
-        API_KEY
-    ))
+    let player_response = minreq::post(format!("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&key={API_KEY}"))
     .with_header("User-Agent", USER_AGENT)
     .with_header("Referer", "https://www.youtube.com/")
     .with_body(request_body)
@@ -95,7 +91,7 @@ fn get_transcript_and_title(
         .captions
         .and_then(|c| c.player_captions_tracklist_renderer)
         .map(|r| r.caption_tracks)
-        .ok_or_else(|| format!("No captions found for video: {}", video_id))?;
+        .ok_or_else(|| format!("No captions found for video: {video_id}"))?;
 
     let track = select_best_track(&tracks, language)?;
 
@@ -149,7 +145,7 @@ fn select_best_track<'a>(
 
     best.ok_or_else(|| {
         let available: Vec<_> = tracks.iter().map(|t| &t.language_code).collect();
-        format!("No captions for '{}'. Available: {:?}", language, available).into()
+        format!("No captions for '{language}'. Available: {available:?}").into()
     })
 }
 

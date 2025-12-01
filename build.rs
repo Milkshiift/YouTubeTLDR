@@ -12,7 +12,7 @@ fn main() {
     println!("cargo:rerun-if-changed=static/style.css");
     println!("cargo:rerun-if-changed=static/index.html");
 
-    let out_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let out_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env var undefined");
     let static_dir = Path::new(&out_dir).join("static");
 
     // --- Process JavaScript ---

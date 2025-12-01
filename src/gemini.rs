@@ -12,12 +12,12 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Request(_) => write!(f, "Failed to send request to the Gemini API"),
-            Error::Api { status, body } => {
+            Self::Request(_) => write!(f, "Failed to send request to the Gemini API"),
+            Self::Api { status, body } => {
                 write!(f, "Gemini API returned an error (status {status}): {body}")
             }
-            Error::Json(_) => write!(f, "Failed to parse a response from the Gemini API"),
-            Error::NoTextInResponse => write!(f, "The API response did not contain any text"),
+            Self::Json(_) => write!(f, "Failed to parse a response from the Gemini API"),
+            Self::NoTextInResponse => write!(f, "The API response did not contain any text"),
         }
     }
 }
@@ -25,9 +25,9 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::Request(e) => Some(e),
-            Error::Json(e) => Some(e),
-            Error::Api { .. } | Error::NoTextInResponse => None,
+            Self::Request(e) => Some(e),
+            Self::Json(e) => Some(e),
+            Self::Api { .. } | Self::NoTextInResponse => None,
         }
     }
 }
@@ -105,7 +105,7 @@ pub fn summarize(
     system_prompt: &str,
     transcript: &str,
 ) -> Result<String, Error> {
-    let req_url = format!("{BASE_URL}/{}:generateContent?key={api_key}", model);
+    let req_url = format!("{BASE_URL}/{model}:generateContent?key={api_key}");
 
     let request_body = GeminiRequest {
         system_instruction: SystemInstruction {
