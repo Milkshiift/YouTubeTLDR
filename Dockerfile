@@ -7,6 +7,7 @@ WORKDIR /YouTubeTLDR
 
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
+COPY ./build.rs ./build.rs
 
 COPY ./src ./src
 COPY ./static ./static
