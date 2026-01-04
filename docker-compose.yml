@@ -1,0 +1,12 @@
+services:
+  youtube-tldr:
+    build: .
+    image: youtube-tldr:latest
+    container_name: youtube-tldr
+    ports:
+      - "8000:8000"
+    environment:
+      - TLDR_IP=0.0.0.0
+      - TLDR_PORT=8000
+      - TLDR_WORKERS=1
+    restart: unless-stopped
