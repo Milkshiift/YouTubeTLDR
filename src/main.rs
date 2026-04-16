@@ -2,7 +2,7 @@ mod gemini;
 mod subtitle;
 
 use crate::subtitle::get_video_data;
-use flume::{Receiver, bounded};
+use flume::{Receiver, TrySendError, bounded};
 use miniserde::{Deserialize, Serialize, json};
 use std::env;
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -118,8 +118,16 @@ fn main() -> io::Result<()> {
 
                 let work_item = WorkItem { stream, addr };
 
-                if sender.try_send(work_item).is_err() {
-                    eprintln!("⚠️ Queue full, rejecting connection from {addr}");
+                if let Err(e) = sender.try_send(work_item) {
+                    let mut rejected = match e {
+                        TrySendError::Full(w) | TrySendError::Disconnected(w) => w,
+                    };
+                    eprintln!("⚠️ Queue full, rejecting connection from {}", rejected.addr);
+                    let _ = write_error_response(
+                        &mut rejected.stream,
+                        "503 Service Unavailable",
+                        "Server is too busy. Please try again later.",
+                    );
                 }
             }
             Err(e) => {

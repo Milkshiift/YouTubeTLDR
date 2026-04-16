@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (el) el.addEventListener('click', () => this.toggleSidebar());
             });
 
-            [dom.apiKey, dom.model, dom.systemPrompt].forEach(el => el.addEventListener('change', this.saveSettings));
+            [dom.apiKey, dom.model, dom.language, dom.systemPrompt].forEach(el => el.addEventListener('change', this.saveSettings));
             [dom.dryRun, dom.transcriptOnly].forEach(el => el.addEventListener('change', this.saveSettings));
         },
 
