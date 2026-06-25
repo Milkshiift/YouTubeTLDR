@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const config = {
         baseURL: `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`,
         storageKeys: {
+            provider: 'youtube-tldr-provider',
             apiKey: 'youtube-tldr-api-key',
             model: 'youtube-tldr-model',
             language: 'youtube-tldr-language',
@@ -11,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
             summaries: 'youtube-tldr-summaries'
         },
         defaults: {
+            provider: 'gemini',
             model: 'gemini-2.5-flash',
             systemPrompt: "You are an expert video summarizer specializing in creating structured, accurate overviews. Given a YouTube video transcript, extract and present the most crucial information in an article-style format. Prioritize fidelity to the original content, ensuring all significant points, arguments, and key details are faithfully represented. Organize the summary logically with clear, descriptive headings and/or concise bullet points. For maximum skim-readability, bold key terms, core concepts, and critical takeaways within the text. Eliminate advertisements, sponsorships, conversational filler, repeated phrases, and irrelevant tangents, but retain all essential content.",
             language: 'en'
@@ -19,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const dom = {
         // Settings
+        provider: document.getElementById('provider'),
         apiKey: document.getElementById('api-key'),
         model: document.getElementById('model'),
         language: document.getElementById('language'),
@@ -81,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (el) el.addEventListener('click', () => this.toggleSidebar());
             });
 
-            [dom.apiKey, dom.model, dom.language, dom.systemPrompt].forEach(el => el.addEventListener('change', this.saveSettings));
+            [dom.provider, dom.apiKey, dom.model, dom.language, dom.systemPrompt].forEach(el => el.addEventListener('change', this.saveSettings));
             [dom.dryRun, dom.transcriptOnly].forEach(el => el.addEventListener('change', this.saveSettings));
         },
 
@@ -98,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         loadSettings() {
+            dom.provider.value = localStorage.getItem(config.storageKeys.provider) || config.defaults.provider;
             dom.apiKey.value = localStorage.getItem(config.storageKeys.apiKey) || '';
             dom.model.value = localStorage.getItem(config.storageKeys.model) || config.defaults.model;
             dom.language.value = localStorage.getItem(config.storageKeys.language) || config.defaults.language;
@@ -107,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         saveSettings() {
+            localStorage.setItem(config.storageKeys.provider, dom.provider.value);
             localStorage.setItem(config.storageKeys.apiKey, dom.apiKey.value);
             localStorage.setItem(config.storageKeys.model, dom.model.value);
             localStorage.setItem(config.storageKeys.language, dom.language.value);
@@ -136,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         url,
+                        provider: dom.provider.value,
                         api_key: dom.apiKey.value,
                         model: dom.model.value,
                         language: dom.language.value,

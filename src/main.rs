@@ -1,4 +1,5 @@
 mod gemini;
+mod pegasus;
 mod subtitle;
 
 use crate::subtitle::get_video_data;
@@ -20,6 +21,9 @@ struct SummarizeRequest {
     language: Option<String>,
     dry_run: bool,
     transcript_only: bool,
+    /// Summary backend: "gemini" (default, transcript-based) or "twelvelabs"
+    /// (Pegasus, watches the video directly from a raw media URL).
+    provider: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -316,6 +320,37 @@ fn perform_summary_work(req: &SummarizeRequest) -> Result<SummarizeResponse, Str
             summary: test_md.to_string(),
             subtitles: test_md.to_string(),
             video_name: "Dry Run".to_string(),
+        });
+    }
+
+    // Pegasus watches the video directly, so it neither needs nor uses the
+    // YouTube transcript. `req.url` must be a direct link to a raw media file.
+    if req.provider.as_deref() == Some("twelvelabs") {
+        let api_key = req
+            .api_key
+            .as_deref()
+            .filter(|k| !k.is_empty())
+            .ok_or("Missing TwelveLabs API key. Get one here: https://twelvelabs.io")?;
+
+        let model = req
+            .model
+            .as_deref()
+            .filter(|m| !m.is_empty())
+            .unwrap_or("pegasus1.5");
+
+        let system_prompt = req
+            .system_prompt
+            .as_deref()
+            .filter(|p| !p.is_empty())
+            .ok_or("Missing system prompt")?;
+
+        let summary = pegasus::summarize(api_key, model, system_prompt, &req.url)
+            .map_err(|e| format!("API error: {e}"))?;
+
+        return Ok(SummarizeResponse {
+            summary,
+            subtitles: String::new(),
+            video_name: req.url.clone(),
         });
     }
 

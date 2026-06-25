@@ -15,6 +15,7 @@
 
 *   🎯 **Customizable Prompts:** Tailor the AI's instructions to get summaries in the format you prefer
 * ⚙️ **Model Selection:** Choose any available Gemini model
+* 🎬 **Video Summaries (optional):** Switch the provider to [TwelveLabs Pegasus](https://twelvelabs.io) to summarize from the video itself instead of the transcript
 * 📝 **View Transcript:** Access the full, raw video transcript
 *   📚 **History:** Your summaries are saved locally in your browser for future reference
 *   🔒 **Privacy-Focused:** Simple Rust server that runs on your own machine. Your data stays yours
@@ -49,6 +50,23 @@ Note: This server is optimized for personal use and utilizes a multithreaded wor
 
 You can change the IP and port with `TLDR_IP` and `TLDR_PORT` environment variables.    
 The amount of workers can be changed with `TLDR_WORKERS`, set it to the amount of concurrent users you expect.
+
+### Summarizing the video instead of the transcript (TwelveLabs Pegasus)
+
+By default summaries are produced from the YouTube transcript with Gemini. You can
+optionally switch to **TwelveLabs Pegasus**, which watches the video itself — useful
+for content that is visual rather than spoken.
+
+1. In **Settings**, set **Provider** to `TwelveLabs Pegasus (video)`
+2. Enter your [TwelveLabs API key](https://twelvelabs.io) (free tier available)
+3. Leave **Model** blank to use `pegasus1.5`, or set another Pegasus model
+4. Paste a **direct link to a raw video file** (e.g. an `.mp4`) and click "Summarize"
+
+> Pegasus analyzes the video pixels directly, so it requires a direct media URL.
+> YouTube watch/share links are not accepted by the TwelveLabs API; point it at a
+> downloadable `.mp4` (or other raw media) URL instead.
+
+This is fully opt-in — the default Gemini transcript flow is unchanged.
 
 ## 🔨 Building from Source
 

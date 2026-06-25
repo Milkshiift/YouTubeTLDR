@@ -50,8 +50,18 @@
                     <summary><span><i data-lucide="settings"></i> Settings</span><i data-lucide="chevron-down" class="chevron"></i></summary>
                      <div class="settings-content">
                          <div>
+                             <label for="provider">
+                                 <i data-lucide="sparkles"></i> Provider
+                             </label>
+                             <select id="provider">
+                                 <option value="gemini">Gemini (transcript)</option>
+                                 <option value="twelvelabs">TwelveLabs Pegasus (video)</option>
+                             </select>
+                         </div>
+
+                         <div>
                              <label for="api-key">
-                                 <i data-lucide="key-round"></i> Gemini API Key
+                                 <i data-lucide="key-round"></i> API Key
                              </label>
                              <input type="password" id="api-key" placeholder="AIzaSy...">
                          </div>
